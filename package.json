@@ -1,0 +1,22 @@
+{
+  "name": "jmcl",
+  "version": "0.1.0",
+  "description": "Simple minecraft launcher",
+  "main": "index.js",
+  "bin": {
+    "jmcl": "bin/jmcl"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rollup -c"
+  },
+  "keywords": [
+    "Minecraft",
+    "launcher"
+  ],
+  "author": "hadroncfy",
+  "license": "MIT",
+  "dependencies": {
+    
+  }
+}

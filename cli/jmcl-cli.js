@@ -1,0 +1,57 @@
+var jmcl = require('../index.js');
+var cli = require('./arg.js');
+
+function oneArg(name){
+    return function(data, arg){
+        data[name] = arg();
+    }
+}
+
+function boolArg(name){
+    return function(data){
+        data[name] = true;
+    }
+}
+
+function setVal(name, val){
+    return function(data){
+        data[name] = val;
+    }
+}
+
+var argParser = cli()
+    .commonOpt('-d|--dir', 'set game directory (default to .minecraft)', oneArg('mcRoot'))
+    .commonOpt('-h|--home', 'set home directory (default to ~)', oneArg('home'))
+
+    .cmd('launch', 'launching minecraft', setVal('cmd', 'launch'))
+        .opt('-u|--user', 'username or email', oneArg('uname'), true)
+        .opt('-v|--version', 'the version to be launched', oneArg('version'), true)
+        .opt('--legacy', 'set user type to legacy', setVal('legacy', true))
+        
+    .cmd('logout', 'logout a user', setVal('cmd', 'logout'))
+        .opt('-u|--user', 'email of the user', oneArg('uname'), true);
+
+module.exports = function(argv){
+    var nodeBin = argv.shift();
+    var appName = argv.shift();
+    try{
+        var opts = argParser.parse(argv);
+    }
+    catch(e){
+        e.forEach(function(msg){
+            console.log(msg);
+        });
+        return -1;
+    }
+    var ctx = new jmcl.Context(console);
+    switch(opts.cmd){
+        case 'launch':
+            jmcl.launch(ctx, opts);
+            break;
+        case 'logout':
+            jmcl.logout(ctx, opts);
+            break;
+        default: console.assert(false);
+    }
+    return 0;
+}
