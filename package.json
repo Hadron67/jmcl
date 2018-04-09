@@ -1,6 +1,6 @@
 {
   "name": "jmcl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Simple minecraft launcher",
   "main": "index.js",
   "bin": {
