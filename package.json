@@ -22,5 +22,16 @@
   "devDependencies": {
     "@types/es6-shim": "^0.31.36",
     "@types/node": "^9.4.7"
-  }
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hadron67/jmcl.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Hadron67/jmcl/issues"
+  },
+  "homepage": "https://github.com/Hadron67/jmcl#readme"
 }
