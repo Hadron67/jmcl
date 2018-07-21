@@ -1,7 +1,7 @@
 import { Context } from './mcenv';
 import { randHex } from './util';
 import * as p from './promise';
-import { MCArg } from './mcarg';
+import { LegacyMCArg, MCArg } from './mcarg';
 
 const authServerInfo = {
     host: 'authserver.mojang.com',
@@ -39,9 +39,9 @@ export class UserManager{
         log.v('user file saved');
         return true;
     }
-    legacyUser(uname: string){
-        // legacy users neednt be saved.
-        return new LegacyUser(uname);
+    offlineUser(uname: string){
+        // offline users neednt be saved.
+        return new OfflineUser(uname);
     }
     mojangUser(email: string): MojangUser{
         return this.users[email] || new MojangUser({email: email});
@@ -96,7 +96,7 @@ export abstract class User {
     }
 }
 
-class LegacyUser extends User{
+class OfflineUser extends User{
     constructor(public name: string){ super(); }
     getType(){ return 'legacy'; }
     getName(){ return this.name; }

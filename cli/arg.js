@@ -50,6 +50,9 @@ module.exports = function(argv){
     /** @type{CmdEntry} */
     var cmd = null;
 
+    /** @type{Option[]} */
+    var commonOpts = {};
+
     var err = null;
 
     function emitErr(msg){

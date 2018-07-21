@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { Context, MCConfig } from './mcenv.js';
-import { MCArg } from './mcarg.js';
+import { LegacyMCArg, MCArg, ArgumentJson, NewMCArg } from './mcarg.js';
 import * as p from './promise';
 
 class VersionManager {
@@ -24,10 +24,10 @@ interface LibraryData {
 interface VersionData {
     libraries: { name: string }[];
     mainClass: string;
-    minecraftArguments: string;
+    minecraftArguments?: string;
+    arguments?: ArgumentJson;
     assets: string;
     type: string;
-
 }
 class Version {
     constructor(public mgr: VersionManager, public vname: string, public versionJson: VersionData){}
@@ -58,7 +58,13 @@ class Version {
         return this.mgr.ctx.getVersionDir(this.vname) + '/' + this.vname + '.jar';
     }
     getArgs(): MCArg{
-        var arg = new MCArg(this.versionJson.minecraftArguments);
+        var arg: MCArg;
+        if('minecraftArguments' in this.versionJson){
+            arg = new LegacyMCArg(this.versionJson.minecraftArguments);
+        }
+        else {
+            arg = new NewMCArg(this.versionJson.arguments);
+        }
         var env = this.mgr.ctx;
         return arg
                 .arg('version_name', this.vname)

@@ -17,3 +17,6 @@ jmcl logout -u <your email>
 ```sh
 jmcl launch -u <user name> -v <version of minecraft> --legacy
 ```
+
+### TODO
+* Game download.

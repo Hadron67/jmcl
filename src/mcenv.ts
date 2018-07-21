@@ -1,4 +1,5 @@
-import { Log } from './log';
+import * as os from 'os';
+import { Log, LogLevel } from './log';
 import { input } from './promise';
 
 export interface MCConfig {
@@ -18,9 +19,12 @@ export class Context {
 
         launcherMetaURL: 'launchermeta.mojang.com'
     };
+    launcherName: string;
+    launcherVersion: string;
     log: Log;
-    constructor(public console: Console){
-        this.log = new Log(console);
+    constructor(public console: Console, logLevel: string){
+        this.log = new Log(console, LogLevel[logLevel]);
+        this.config.home = os.homedir();
     }
     getMCRoot(){
         return `${this.config.home}/${this.config.mcRoot}`;   

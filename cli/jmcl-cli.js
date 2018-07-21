@@ -1,5 +1,6 @@
 var jmcl = require('../index.js');
 var cli = require('./arg.js');
+var pkg = require('../package.json');
 
 function oneArg(name){
     return function(data, arg){
@@ -20,16 +21,17 @@ function setVal(name, val){
 }
 
 var argParser = cli()
-    .commonOpt('-d|--dir', 'set game directory (default to .minecraft)', oneArg('mcRoot'))
-    .commonOpt('-h|--home', 'set home directory (default to ~)', oneArg('home'))
-
     .cmd('launch', 'launching minecraft', setVal('cmd', 'launch'))
         .opt('-u|--user', 'username or email', oneArg('uname'), true)
         .opt('-v|--version', 'the version to be launched', oneArg('version'), true)
-        .opt('--legacy', 'set user type to legacy', setVal('legacy', true))
+        .opt('--offline', 'set user type to offline', setVal('offline', true))
         
     .cmd('logout', 'logout a user', setVal('cmd', 'logout'))
-        .opt('-u|--user', 'email of the user', oneArg('uname'), true);
+        .opt('-u|--user', 'email of the user', oneArg('uname'), true)
+        
+    .commonOpt('-d|--dir', 'set game directory (default to .minecraft)', oneArg('mcRoot'))
+    .commonOpt('-h|--home', 'set home directory (default to ~)', oneArg('home'))
+    .commonOpt('-l|--logLevel', 'set log level', oneArg('logLevel'));
 
 module.exports = function(argv){
     var nodeBin = argv.shift();
@@ -43,7 +45,9 @@ module.exports = function(argv){
         });
         return -1;
     }
-    var ctx = new jmcl.Context(console);
+    var ctx = new jmcl.Context(console, opts.logLevel);
+    ctx.launcherName = pkg.name;
+    ctx.launcherVersion = pkg.version;
     switch(opts.cmd){
         case 'launch':
             jmcl.launch(ctx, opts);

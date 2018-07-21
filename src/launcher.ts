@@ -8,7 +8,7 @@ import { Context } from './mcenv';
 export interface LaunchOption {
     uname: string;
     version: string;
-    legacy: boolean;
+    offline: boolean;
 }
 export async function launch(ctx: Context, opt: LaunchOption){
     if(!opt.uname){
@@ -17,7 +17,7 @@ export async function launch(ctx: Context, opt: LaunchOption){
     if(!opt.version){
         throw new Error('version not given');
     }
-    opt.legacy = !!opt.legacy;
+    opt.offline = !!opt.offline;
     var log = ctx.log;
     
     async function launch1(): Promise<void>{
@@ -26,8 +26,8 @@ export async function launch(ctx: Context, opt: LaunchOption){
         var user: User;
         await prepareDirs(ctx);
         await umgr.loadFromFile();
-        if(opt.legacy){
-            user = umgr.legacyUser(opt.uname);
+        if(opt.offline){
+            user = umgr.offlineUser(opt.uname);
         }
         else {
             var user2 = umgr.mojangUser(opt.uname);
@@ -42,21 +42,23 @@ export async function launch(ctx: Context, opt: LaunchOption){
         var jars = v.getJars();
         jars.push(v.getJarName());
         user.initArg(mcargs);
+
+        mcargs.arg('classpath', jars.join(':'))
+            .arg('natives_directory', v.getNativeDir())
+            .arg('user_home', ctx.config.home)
+
+            .arg('launcher_name', ctx.launcherName)
+            .arg('launcher_version', ctx.launcherVersion);
         
         log.i('generating arguments');
         var cmd = [
             'java',
-            "-Xincgc",
-            '-XX:-UseAdaptiveSizePolicy',
-            '-XX:-OmitStackTraceInFastThrow',
-            '-Xmn128m',
-            '-Xmx2048M',
-            '-Djava.library.path=' + v.getNativeDir(),
-            '-Duser.home=' + ctx.config.home,
-            '-cp ' + jars.join(':'),
+            mcargs.jvmArg(),
             v.getMainClass(),
-            mcargs.toString()
+            mcargs.gameArg()
         ];
+
+        log.v(`arguments: ${cmd.join(' ')}`);
     
         log.i('launching game');
         await p.exec(cmd.join(' '), process.stdout, process.stderr);
