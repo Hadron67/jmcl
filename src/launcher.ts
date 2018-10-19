@@ -53,6 +53,11 @@ export async function launch(ctx: Context, opt: LaunchOption){
         log.i('generating arguments');
         var cmd = [
             'java',
+            "-Xincgc",
+            '-XX:-UseAdaptiveSizePolicy',
+            '-XX:-OmitStackTraceInFastThrow',
+            '-Xmn128m',
+            '-Xmx2048M',
             mcargs.jvmArg(),
             v.getMainClass(),
             mcargs.gameArg()

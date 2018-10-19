@@ -1,15 +1,18 @@
 {
     "compilerOptions": {
         "module": "es2015",
-        "target": "es5",
+        "target": "es2018",
         "removeComments": true,
         "moduleResolution": "node",
-        "sourceMap": true
+        "sourceMap": true,
+        "lib": [
+            "es6"
+        ]
     },
     "include": [
         "src/**/*.ts"
     ],
     "exclude": [
         "typings/browser.d.ts"
-    ]
+    ],
 }

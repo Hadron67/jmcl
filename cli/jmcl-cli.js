@@ -48,6 +48,10 @@ module.exports = function(argv){
     var ctx = new jmcl.Context(console, opts.logLevel);
     ctx.launcherName = pkg.name;
     ctx.launcherVersion = pkg.version;
+    if (opts.home !== undefined)
+        ctx.config.home = opts.home;
+    if (opts.mcRoot !== undefined)
+        ctx.config.mcRoot = opts.mcRoot;
     switch(opts.cmd){
         case 'launch':
             jmcl.launch(ctx, opts);

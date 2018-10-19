@@ -27,11 +27,6 @@ export class LegacyMCArg implements MCArg {
     }
     jvmArg(){
         return [
-            "-Xincgc",
-            '-XX:-UseAdaptiveSizePolicy',
-            '-XX:-OmitStackTraceInFastThrow',
-            '-Xmn128m',
-            '-Xmx2048M',
             `-cp ${this.argv.classpath}`,
             `-Djava.library.path=${this.argv.natives_directory}`,
             `-Duser.home=${this.argv.user_home}`,
