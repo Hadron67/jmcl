@@ -1,5 +1,6 @@
 import * as os from 'os';
-import { getOS } from './osutil';
+import { CompatibilityRule, checkRule } from './compatibility-rule';
+import { MCConfig } from './mcenv';
 
 export interface EnvironmentVars {
 
@@ -33,23 +34,13 @@ export class LegacyMCArg implements MCArg {
         ].join(' ');
     }
 }
-
-interface ArgumentItem {
+type ArgumentItem = string | CompoundArgumentItem;
+interface CompoundArgumentItem {
     value: string[] | string;
     compatibilityRules?: CompatibilityRule[];
+    rules?: CompatibilityRule[];
 }
-interface CompatibilityRule {
-    action: 'allow';
-    features?: {
-        has_custom_resolution?: boolean;
-        is_demo_user?: boolean;
-    };
-    os?: {
-        name?: string;
-        version?: string;
-        arch?: string;
-    };
-}
+
 export interface ArgumentJson {
     game: ArgumentItem[];
     jvm: ArgumentItem[];
@@ -58,39 +49,8 @@ export interface ArgumentJson {
 export class NewMCArg implements MCArg {
     argv: {[s: string]: string} = {};
 
-    constructor(private _argJson: ArgumentJson){}
+    constructor(private _argJson: ArgumentJson, public cfg: MCConfig){}
 
-    private _checkRule(rule: CompatibilityRule){
-        if(rule.os){
-            var { osName, osV, osArch } = getOS();
-            if(rule.os.name && rule.os.name !== osName){
-                return false;
-            }
-            if(rule.os.version && !new RegExp(rule.os.version).test(osV)){
-                return false;
-            }
-            if(rule.os.arch && rule.os.arch !== osArch){
-                return false;
-            }
-        }
-        if(rule.features){
-            if(rule.features.has_custom_resolution && this.argv.resolution_width === undefined){
-                return false;
-            }
-            if(rule.features.is_demo_user){
-                return false;
-            }
-        }
-        return true;
-    }
-    private _checkRules(rules: CompatibilityRule[]): boolean{
-        for(var rule of rules){
-            if(!this._checkRule(rule)){
-                return false;
-            }
-        }
-        return true;
-    }
     private _replaceVals(ret: string){
         for(var name in this.argv){
             ret = ret.replace('${' + name + '}', this.argv[name]);
@@ -98,17 +58,31 @@ export class NewMCArg implements MCArg {
         return ret;
     }
 
+    private _allowed(arg: CompoundArgumentItem): boolean{
+        if (arg.compatibilityRules){
+            return checkRule(this.cfg, arg.compatibilityRules);
+        }
+        else if (arg.rules) {
+            return checkRule(this.cfg, arg.rules);
+        }
+        else
+            return true;
+    }
+
     private _genArg(argItem: ArgumentItem[]): string{
         var ret: string[] = [];
         for(var arg of argItem){
-            if(arg.compatibilityRules === undefined || this._checkRules(arg.compatibilityRules)){
-                if (typeof arg.value === 'string')
-                    ret.push(this._replaceVals(arg.value));
-                else
-                    for(var val of arg.value){
-                        ret.push(this._replaceVals(val));
-                    }
-            }
+            if (typeof arg === 'string')
+                ret.push(this._replaceVals(arg));
+            else
+                if(this._allowed(arg)){
+                    if (typeof arg.value === 'string')
+                        ret.push(this._replaceVals(arg.value));
+                    else
+                        for(var val of arg.value){
+                            ret.push(this._replaceVals(val));
+                        }
+                }
         }
         return ret.join(' ');
     }

@@ -38,7 +38,7 @@ export async function launch(ctx: Context, opt: LaunchOption){
             user = user2;
         }
         var v = await vmgr.getVersion(opt.version);
-        var mcargs = v.getArgs();
+        var mcargs = v.getArgs(ctx.config);
         var jars = v.getJars();
         jars.push(v.getJarName());
         user.initArg(mcargs);

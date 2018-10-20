@@ -1,6 +1,6 @@
 {
   "name": "jmcl",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Simple minecraft launcher",
   "main": "index.js",
   "bin": {
@@ -16,12 +16,13 @@
   ],
   "author": "hadroncfy",
   "license": "MIT",
-  "dependencies": {
-    "@types/es6-promise": "^3.3.0"
-  },
   "devDependencies": {
     "@types/es6-shim": "^0.31.36",
-    "@types/node": "^9.4.7"
+    "@types/node": "^9.4.7",
+    "rollup": "^0.53.3",
+    "typescript": "^2.6",
+    "rollup-plugin-typescript2": "^0.8.4",
+    "rollup-plugin-sourcemaps": "^0.4.2"
   },
   "directories": {
     "test": "tests"

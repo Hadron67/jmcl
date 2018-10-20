@@ -65,13 +65,13 @@ class Version {
     getJarName(){
         return this.mgr.ctx.getVersionDir(this.vname) + '/' + this.vname + '.jar';
     }
-    getArgs(): MCArg{
+    getArgs(cfg: MCConfig): MCArg{
         var arg: MCArg;
         if('minecraftArguments' in this.versionJson){
             arg = new LegacyMCArg(this.versionJson.minecraftArguments);
         }
         else {
-            arg = new NewMCArg(this.versionJson.arguments);
+            arg = new NewMCArg(this.versionJson.arguments, cfg);
         }
         var env = this.mgr.ctx;
         return arg

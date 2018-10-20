@@ -6,7 +6,7 @@ var darwin2mac = {
     
 };
 
-export function getOS(): { osName, osV, osArch }{
+export function getOS(): { osName: string, osV: string, osArch: string }{
     var sn: string = os.type();
     var v = os.release();
     var a = os.arch();
