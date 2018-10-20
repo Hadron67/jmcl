@@ -16,10 +16,18 @@ class VersionManager {
         return ret;
     }
 }
+interface DownloadInfo {
+    url: string;
+    sha1: string;
+    size: number;
+};
 interface LibraryData {
     name: string;
-    natives: {[os: string]: string};
-    
+    natives?: {[os: string]: string};
+    downloads: {
+        artifact: DownloadInfo, 
+        classifiers: {[name: string]: DownloadInfo}
+    };
 }
 interface VersionData {
     libraries: { name: string }[];
@@ -76,11 +84,12 @@ class Version {
 }
 
 interface VersionManifest {
+    __comment?: string,
     latest: { snapshot: string, release: string },
     versions: { id: string, type: string, time:string, releaseTime: string, url: string }[]
 }
 export async function getVersionManifest(config: MCConfig){
-    return JSON.parse(await p.httpsGet(config.launcherMetaURL, '/mc/game/version_manifest.json')) as VersionManifest;
+    return JSON.parse(await p.httpsGet(config.launcherMetaURL, '/mc/game/version_manifest.json'));
 }
 
 export { VersionManager }

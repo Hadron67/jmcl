@@ -35,7 +35,7 @@ export class LegacyMCArg implements MCArg {
 }
 
 interface ArgumentItem {
-    value: string[];
+    value: string[] | string;
     compatibilityRules?: CompatibilityRule[];
 }
 interface CompatibilityRule {
@@ -102,9 +102,12 @@ export class NewMCArg implements MCArg {
         var ret: string[] = [];
         for(var arg of argItem){
             if(arg.compatibilityRules === undefined || this._checkRules(arg.compatibilityRules)){
-                for(var val of arg.value){
-                    ret.push(this._replaceVals(val));
-                }
+                if (typeof arg.value === 'string')
+                    ret.push(this._replaceVals(arg.value));
+                else
+                    for(var val of arg.value){
+                        ret.push(this._replaceVals(val));
+                    }
             }
         }
         return ret.join(' ');

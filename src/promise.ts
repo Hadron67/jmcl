@@ -75,20 +75,14 @@ export function ajax(opt: AjaxOptions): Promise<string>{
         method: opt.method,
         headers : opt.headers
     };
-    return new Promise(function(acc, rej){
+    return new Promise((acc, rej) => {
         var data = '';
-        var req = https.request(opt, function(res){
+        var req = https.request(opt, res => {
             res.setEncoding('utf-8');
-            res.on('data', function(d){
-                data += d;
-            });
-            res.on('end', function(){
-                acc(data);
-            });
+            res.on('data', d => data += d);
+            res.on('end', () => acc(data));
         });
-        req.on('error', function(e){
-            rej(e);
-        });
+        req.on('error', e => rej(e));
         opt.body && req.write(opt.body);
         req.end();
     }) as Promise<string>;
