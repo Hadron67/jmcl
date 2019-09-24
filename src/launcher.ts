@@ -31,15 +31,13 @@ export async function launch(ctx: Context, opt: LaunchOption){
         }
         else {
             var user2 = umgr.mojangUser(opt.uname);
-            await user2.makeValid(ctx, opt.version, () => {
-                return ctx.readInput(`password for ${user2.email}:`, true);
-            });
+            await user2.makeValid(ctx, opt.version, () => ctx.readInput(`password for ${user2.email}:`, true));
             await umgr.addMojangUser(user2);
             user = user2;
         }
         var v = await vmgr.getVersion(opt.version);
         var mcargs = v.getArgs(ctx.config);
-        var jars = v.getJars();
+        var jars = v.getJars(ctx.config);
         jars.push(v.getJarName());
         user.initArg(mcargs);
 
@@ -66,7 +64,7 @@ export async function launch(ctx: Context, opt: LaunchOption){
         log.v(`arguments: ${cmd.join(' ')}`);
     
         log.i('launching game');
-        await p.exec(cmd.join(' '), process.stdout, process.stderr);
+        let prc = await p.exec(cmd.join(' '), process.stdout, process.stderr);
         log.i('game quit');
     }
 

@@ -1,6 +1,7 @@
 import * as os from 'os';
 import { Log, LogLevel } from './log';
 import { input } from './promise';
+import * as pathd from 'path';
 
 export interface MCConfig {
     launcherRoot: string;
@@ -29,13 +30,16 @@ export class Context {
         this.config.home = os.homedir();
     }
     getMCRoot(){
-        return `${this.config.home}/${this.config.mcRoot}`;   
+        // return `${this.config.home}/${this.config.mcRoot}`;   
+        return pathd.join(this.config.home, this.config.mcRoot);
     }
     getVersionDir(vname: string){
-        return `${this.config.home}/${this.config.mcRoot}/versions/${vname}`;
+        // return `${this.config.home}/${this.config.mcRoot}/versions/${vname}`;
+        return pathd.join(this.config.home, this.config.mcRoot, 'versions', vname);
     }
     getLauncherDir(){
-        return `${this.config.home}/${this.config.mcRoot}/${this.config.launcherRoot}`;
+        // return `${this.config.home}/${this.config.mcRoot}/${this.config.launcherRoot}`;
+        return pathd.join(this.config.home, this.config.mcRoot, this.config.launcherRoot);
     }
     async readInput(q: string, hidden: boolean){
         return input(q, hidden);

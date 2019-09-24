@@ -10,10 +10,12 @@ export interface MCArg {
     arg(name: string, val: string): MCArg;
     jvmArg(): string;
     gameArg(): string;
+    appendRaw(s: string): void;
 }
 
 export class LegacyMCArg implements MCArg {
     argv: {[s: string]: string} = {};
+    extra: string = '';
     constructor(public argTemp: string){}
     arg(name: string, v: string){
         this.argv[name] = v;
@@ -31,7 +33,11 @@ export class LegacyMCArg implements MCArg {
             `-cp ${this.argv.classpath}`,
             `-Djava.library.path=${this.argv.natives_directory}`,
             `-Duser.home=${this.argv.user_home}`,
+            this.extra
         ].join(' ');
+    }
+    appendRaw(s: string){
+        this.extra += s;
     }
 }
 type ArgumentItem = string | CompoundArgumentItem;
@@ -48,6 +54,7 @@ export interface ArgumentJson {
 
 export class NewMCArg implements MCArg {
     argv: {[s: string]: string} = {};
+    extra = '';
 
     constructor(private _argJson: ArgumentJson, public cfg: MCConfig){}
 
@@ -94,6 +101,9 @@ export class NewMCArg implements MCArg {
         return this._genArg(this._argJson.game);
     }
     jvmArg(){
-        return this._genArg(this._argJson.jvm);
+        return this._genArg(this._argJson.jvm) + ' ' + this.extra;
+    }
+    appendRaw(s: string){
+        this.extra += s;
     }
 }

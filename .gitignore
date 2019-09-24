@@ -3,3 +3,5 @@ node_modules/**
 .rpt2_cache/**
 .vscode/**
 logs/**
+lib/**
+pnpm-debug.log

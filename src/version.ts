@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import { Context, MCConfig } from './mcenv.js';
 import { LegacyMCArg, MCArg, ArgumentJson, NewMCArg } from './mcarg.js';
 import * as p from './promise';
+import { CompatibilityRule, checkRule } from './compatibility-rule.js';
+import * as pathd from 'path';
 
 class VersionManager {
     versions: {[v: string]: Version} = {};
@@ -10,7 +12,7 @@ class VersionManager {
         var ret = this.versions[vname];
         var cela = this;
         if(!ret){
-            var jsonPath = cela.ctx.getVersionDir(vname) + '/' + vname + '.json';
+            let jsonPath = pathd.join(this.ctx.getVersionDir(vname), vname + '.json');
             ret = cela.versions[vname] = new Version(cela, vname, JSON.parse(await p.readFile(jsonPath)));
         }
         return ret;
@@ -21,6 +23,7 @@ interface DownloadInfo {
     sha1: string;
     size: number;
 };
+
 interface LibraryData {
     name: string;
     natives?: {[os: string]: string};
@@ -28,42 +31,60 @@ interface LibraryData {
         artifact: DownloadInfo, 
         classifiers: {[name: string]: DownloadInfo}
     };
+    rules?: CompatibilityRule[];
 }
+interface LoggingInfo {
+    argument: string;
+    file: {
+        id: string;
+        sha1: string;
+        size: number;
+        url: string;
+    },
+    type: string;
+};
 interface VersionData {
-    libraries: { name: string }[];
+    libraries: LibraryData[];
     mainClass: string;
     minecraftArguments?: string;
     arguments?: ArgumentJson;
     assets: string;
     type: string;
+    logging: {
+        client: LoggingInfo
+    };
 }
 class Version {
     constructor(public mgr: VersionManager, public vname: string, public versionJson: VersionData){}
-    getJars(): string[]{
-        var libdir = this.mgr.ctx.getMCRoot() + '/libraries';
+    getJars(cfg: MCConfig): string[]{
+        let libdir = pathd.join(this.mgr.ctx.getMCRoot(), 'libraries');
         var ret: string[] = [];
+        let libs: {[n: string]: boolean} = {};
         for(var lib of this.versionJson.libraries){
             var name = lib.name;
             var parts = name.split(':');
-            var pkg = parts[0].replace(/\./g, "/");
+            let pkg = pathd.join(...parts[0].split(/\./g));
             var clazz = parts[1];
             var classv = parts[2];
             
-            ret.push(
-                [libdir, pkg, clazz, classv, clazz + '-' + classv + '.jar'].join('/')
-            );
+            if (!libs[name] && (!lib.rules || checkRule(cfg, lib.rules))){
+                libs[name] = true;
+                ret.push(
+                    pathd.join(libdir, pkg, clazz, classv, `${clazz}-${classv}.jar`)
+                );
+            }
         }
         //todo: inherits from
         return ret;
     }
     getNativeDir(){
-        return this.mgr.ctx.getVersionDir(this.vname) + '/' + this.vname + '-natives/';
+        return pathd.join(this.mgr.ctx.getVersionDir(this.vname), this.vname + '-natives/');
     }
     getMainClass (){
         return this.versionJson.mainClass;
     }
     getJarName(){
-        return this.mgr.ctx.getVersionDir(this.vname) + '/' + this.vname + '.jar';
+        return pathd.join(this.mgr.ctx.getVersionDir(this.vname), this.vname + '.jar');
     }
     getArgs(cfg: MCConfig): MCArg{
         var arg: MCArg;
@@ -73,11 +94,16 @@ class Version {
         else {
             arg = new NewMCArg(this.versionJson.arguments, cfg);
         }
+
         var env = this.mgr.ctx;
+        let logging = this.versionJson.logging.client;
+        let assetsDir = pathd.join(env.getMCRoot(), 'assets');
+        // arg.appendRaw(logging.argument.replace(/\${path}/g, pathd.join(assetsDir, 'log_configs', logging.file.id)));
+        
         return arg
                 .arg('version_name', this.vname)
                 .arg('game_directory', env.getMCRoot())
-                .arg('assets_root', env.getMCRoot() + '/assets')
+                .arg('assets_root', assetsDir)
                 .arg('assets_index_name', this.versionJson.assets)
                 .arg('version_type', this.versionJson.type);
     }

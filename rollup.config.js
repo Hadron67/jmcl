@@ -4,7 +4,7 @@ import typescript from 'typescript';
 
 export default {
     input: 'src/main.ts',
-    external: ['fs', 'child_process', 'https', 'readline', 'stream', 'os'],
+    external: ['fs', 'child_process', 'https', 'readline', 'stream', 'os', 'path'],
 
     output: [
         {

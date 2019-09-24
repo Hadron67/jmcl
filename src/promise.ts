@@ -4,46 +4,41 @@ import * as https from 'https';
 import * as readline from 'readline';
 import { Writable } from 'stream';
 
-export function pass<T>(arg): Promise<T>{
+export function pass<T>(arg: T): Promise<T>{
     return new Promise<T>(function(acc, reject){
         acc(arg);
     });
 }
-export function reject<T>(reason: T): PromiseLike<any>{
-    return new Promise(function(acc, reject){
+export function reject<T>(reason: T): PromiseLike<T>{
+    return new Promise<T>(function(acc, reject){
         reject(reason);
     });
 }
-export function fileExists(fn): Promise<boolean>{
-    return new Promise(function(acc, reject){
-        fs.exists(fn, function(exi){
-            acc(exi);
-        });
-    }) as Promise<boolean>;
+export function fileExists(fn: fs.PathLike): Promise<boolean>{
+    return new Promise<boolean>((acc, reject) => {
+        fs.exists(fn, exi => acc(exi));
+    });
 }
-export function mkdir(path, mask){
-    return new Promise(function(acc, rej){
+export function mkdir(path: fs.PathLike, mask: string | number){
+    return new Promise<void>(function(acc, rej){
         fs.mkdir(path, mask, function(err){
             err ? rej(err) : acc();
         });
     });
 }
-export function mkdirIfNotExists(path, mask){
-    return fileExists(path)
-        .then(function(exi){
-            if(!exi){
-                return mkdir(path, mask);
-            }
-        });
+export async function mkdirIfNotExists(path: fs.PathLike, mask: string | number){
+    if (!await fileExists(path)){
+        await mkdir(path, mask);
+    }
 }
-export function readFile(fn): Promise<string>{
+export function readFile(fn: fs.PathLike): Promise<string>{
     return new Promise(function(acc, reject){
         fs.readFile(fn, function(err, data){
             err ? reject(err) : acc(data.toString());
         });
     }) as Promise<string>;
 }
-export function writeFile(fn, s){
+export function writeFile(fn: fs.PathLike, s: any){
     return new Promise(function(acc, reject){
         fs.writeFile(fn, s, function(err){
             err ? reject(err) : acc();
@@ -51,12 +46,18 @@ export function writeFile(fn, s){
     });
 }
 export function exec(cmd: string, stdout, stderr){
+    let cmds = cmd.split(/[ ]+/g);
     return new Promise(function(acc, reject){
-        var pr = cpc.exec(cmd, function(err, stdout, stderr){
-            err ? reject(err) : acc();
-        });
-        pr.stdout.pipe(stdout);
-        pr.stderr.pipe(stderr);
+        let p = cpc.spawn(cmds[0], cmds.slice(1));
+        p.stdout.pipe(stdout);
+        p.stderr.pipe(stderr);
+        p.on('exit', () => acc());
+        p.on('error', err => reject(err));
+        // var pr = cpc.exec(cmd, function(err, stdout, stderr){
+        //     err ? reject(err) : acc();
+        // });
+        // pr.stdout.pipe(stdout);
+        // pr.stderr.pipe(stderr);
     });
 }
 export interface AjaxOptions {

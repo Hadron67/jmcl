@@ -2,6 +2,7 @@ import { Context } from './mcenv';
 import { randHex } from './util';
 import * as p from './promise';
 import { LegacyMCArg, MCArg } from './mcarg';
+import * as pathd from 'path';
 
 const authServerInfo = {
     host: 'authserver.mojang.com',
@@ -16,25 +17,27 @@ export class UserManager{
     saveFileName = 'users.json';
     constructor(public ctx: Context){}
     async loadFromFile(){
-        var fn = this.ctx.getLauncherDir() + '/' + this.saveFileName;
-        var cela = this;
+        // var fn = this.ctx.getLauncherDir() + '/' + this.saveFileName;
+        let fn = pathd.join(this.ctx.getLauncherDir(), this.saveFileName);
+        // var cela = this;
         if(await p.fileExists(fn)){
-            cela.ctx.log.i('user file exists, reading');
+            this.ctx.log.i('user file exists, reading');
             var us = JSON.parse(await p.readFile(fn)) as {[s: string]: MojangUserData};
             for(var name in us){
                 var u = us[name];
-                cela.users[name] = new MojangUser(u);
+                this.users[name] = new MojangUser(u);
             }
-            cela.ctx.log.i('done loading users');
+            this.ctx.log.i('done loading users');
         }
         else {
-            cela.ctx.log.i('user file not exists, skipping');
+            this.ctx.log.i('user file not exists, skipping');
         }
         return true;
     }
     async save(){
-        var fn = this.ctx.getLauncherDir() + '/' + this.saveFileName;
-        var log = this.ctx.log;
+        // var fn = this.ctx.getLauncherDir() + '/' + this.saveFileName;
+        let fn = pathd.join(this.ctx.getLauncherDir(), this.saveFileName);
+        let log = this.ctx.log;
         await p.writeFile(fn, JSON.stringify(this.users));
         log.v('user file saved');
         return true;
@@ -54,30 +57,35 @@ export class UserManager{
         return this.save();
     }
     async logoutUser(u: MojangUser, getPass: () => Promise<string>){
-        async function logout2(pass: string){
-            var res = await p.httpsPost(authServerInfo.host, authServerInfo.logout, {
-                username: u.email,
-                password: pass
-            });
-            if(res !== ''){
-                throw JSON.parse(res).errorMessage;
-            }
-            return true;
-        }
+        // async function logout2(pass: string){
+        //     var res = await p.httpsPost(authServerInfo.host, authServerInfo.logout, {
+        //         username: u.email,
+        //         password: pass
+        //     });
+        //     if(res !== ''){
+        //         throw JSON.parse(res).errorMessage;
+        //     }
+        //     return true;
+        // }
         var cela = this;
         var log = this.ctx.log;
         if(await u.validAndRefresh(this.ctx)){
             log.i('user is valid, logging out');
             await u.logout();
-            log.i('successfully logged out');
-            delete cela.users[u.email];
         }
         else {
             log.i('user is not valid, logging out using password');
-            await logout2(await getPass());
-            log.i('successfully logged out');
-            delete cela.users[u.email];
+            // await logout2(await getPass());
+            let res = await p.httpsPost(authServerInfo.host, authServerInfo.logout, {
+                username: u.email,
+                password: await getPass()
+            });
+            if (res !== ''){
+                throw JSON.parse(res).errorMessage;
+            }
         }
+        log.i('successfully logged out');
+        delete cela.users[u.email];
         return cela.save();
     }
 }
@@ -92,7 +100,7 @@ export abstract class User {
             .arg('user_type', this.getType())
             .arg('auth_player_name', this.getName())
             .arg('auth_uuid', this.getUUID())
-            .arg('auth_access_token', this.getToken())
+            .arg('auth_access_token', this.getToken());
     }
 }
 
@@ -190,20 +198,24 @@ class MojangUser extends User{
     }
     async makeValid(ctx: Context, version: string, getPass: () => Promise<string>){
         var log = ctx.log;
-        var cela = this;
-        async function login1(){
-            var pass = await getPass();
-            log.i('logging in');
-            await cela.login(pass, version);
-            log.i('logging in successful');
-            return true;
-        }
+        // var cela = this;
+        // async function login1(){
+        //     var pass = await getPass();
+        //     log.i('logging in');
+        //     await cela.login(pass, version);
+        //     log.i('logging in successful');
+        //     return true;
+        // }
         if(await this.validAndRefresh(ctx)){
             log.i('user is valid');
         }
         else {
             log.i('user is invalid, login required');
-            return login1();
+            // return login1();
+            let pass = await getPass();
+            log.i('logging in');
+            await this.login(pass, version);
+            log.i('logging in successfull');
         }
         return true;
     }
