@@ -1,11 +1,14 @@
 dependencies:
-  tslib: 1.9.3
+  yauzl: 2.10.0
 devDependencies:
   '@types/es6-shim': 0.31.39
   '@types/node': 9.6.47
+  '@types/yauzl': 2.9.1
   rollup: 1.20.3
+  rollup-plugin-json: 4.0.0
   rollup-plugin-sourcemaps: 0.4.2_rollup@1.20.3
   rollup-plugin-typescript2: 0.24.0_rollup@1.20.3+typescript@3.6.2
+  tslib: 1.10.0
   typescript: 3.6.2
 lockfileVersion: 5.1
 packages:
@@ -25,6 +28,16 @@ packages:
     dev: true
     resolution:
       integrity: sha512-56wEJWXZs+3XXoTe/OCpdZ6czrONhy+6hT0GdPOb7HvudLTMJ1T5tuZPs37K5cPR5t+J9+vLPFDQgUQ8NWJE1w==
+  /@types/node/9.6.52:
+    dev: true
+    resolution:
+      integrity: sha512-d6UdHtc8HKe3NTruj9mHk2B8EiHZyuG/00aYbUedHvy9sBhtLAX1gaxSNgvcheOvIZavvmpJYlwfHjjxlU/Few==
+  /@types/yauzl/2.9.1:
+    dependencies:
+      '@types/node': 9.6.52
+    dev: true
+    resolution:
+      integrity: sha512-A1b8SU4D10uoPjwb0lnHmmu8wZhR9d+9o2PKBQT2jU5YPTKsxac6M2qGAdY7VcL+dHHhARVUDmeg0rOrcd9EjA==
   /acorn/7.0.0:
     dev: true
     engines:
@@ -39,6 +52,10 @@ packages:
     hasBin: true
     resolution:
       integrity: sha512-Wm6ukoaOGJi/73p/cl2GvLjTI5JM1k/O14isD73YML8StrH/7/lRFgmg8nICZgD3bZZvjwCGxtMOD3wWNAu8cg==
+  /buffer-crc32/0.2.13:
+    dev: false
+    resolution:
+      integrity: sha1-DTM+PwDqxQqhRUq9MO+MKl2ackI=
   /commondir/1.0.1:
     dev: true
     resolution:
@@ -53,6 +70,12 @@ packages:
     dev: true
     resolution:
       integrity: sha512-SqmZANLWS0mnatqbSfRP5g8OXZC12Fgg1IwNtLsyHDzJizORW4khDfjPqJZsemPWBB2uqykUah5YpQ6epsqC/w==
+  /fd-slicer/1.1.0:
+    dependencies:
+      pend: 1.2.0
+    dev: false
+    resolution:
+      integrity: sha1-JcfInLH5B3+IkbvmHY85Dq4lbx4=
   /find-cache-dir/3.0.0:
     dependencies:
       commondir: 1.0.1
@@ -140,6 +163,10 @@ packages:
     dev: true
     resolution:
       integrity: sha512-GSmOT2EbHrINBf9SR7CDELwlJ8AENk3Qn7OikK4nFYAu3Ote2+JYNVvkpAEQm3/TLNEJFD/xZJjzyxg3KBWOzw==
+  /pend/1.2.0:
+    dev: false
+    resolution:
+      integrity: sha1-elfrVQpng/kRUzH89GY9XI4AelA=
   /pkg-dir/4.2.0:
     dependencies:
       find-up: 4.1.0
@@ -158,6 +185,12 @@ packages:
     dev: true
     resolution:
       integrity: sha512-B/dOmuoAik5bKcD6s6nXDCjzUKnaDvdkRyAk6rsmsKLipWj4797iothd7jmmUhWTfinVMU+wc56rYKsit2Qy4w==
+  /rollup-plugin-json/4.0.0:
+    dependencies:
+      rollup-pluginutils: 2.8.2
+    dev: true
+    resolution:
+      integrity: sha512-hgb8N7Cgfw5SZAkb3jf0QXii6QX/FOkiIq2M7BAQIEydjHvTyxXHQiIzZaTFgx1GK0cRCHOCBHIyEkkLdWKxow==
   /rollup-plugin-sourcemaps/0.4.2_rollup@1.20.3:
     dependencies:
       rollup: 1.20.3
@@ -192,6 +225,12 @@ packages:
     dev: true
     resolution:
       integrity: sha512-J5oAoysWar6GuZo0s+3bZ6sVZAC0pfqKz68De7ZgDi5z63jOVZn1uJL/+z1jeKHNbGII8kAyHF5q8LnxSX5lQg==
+  /rollup-pluginutils/2.8.2:
+    dependencies:
+      estree-walker: 0.6.1
+    dev: true
+    resolution:
+      integrity: sha512-EEp9NhnUkwY8aif6bxgovPHMoMoNr2FulJziTndpt5H9RdwC47GSGuII9XxpSdzVGM0GWrNPHV6ie1LTNJPaLQ==
   /rollup/1.20.3:
     dependencies:
       '@types/estree': 0.0.39
@@ -224,10 +263,6 @@ packages:
     dev: true
     resolution:
       integrity: sha512-qOebF53frne81cf0S9B41ByenJ3/IuH8yJKngAX35CmiZySA0khhkovshKK+jGCaMnVomla7gVlIcc3EvKPbTQ==
-  /tslib/1.9.3:
-    dev: false
-    resolution:
-      integrity: sha512-4krF8scpejhaOgqzBEcGM7yDIEfi0/8+8zDRZhNZZ2kjmHJ4hv3zCbQWxoJGz1iw5U0Jl0nma13xzHXcncMavQ==
   /typescript/3.6.2:
     dev: true
     engines:
@@ -245,11 +280,21 @@ packages:
     dev: true
     resolution:
       integrity: sha1-2pN/emLiH+wf0Y1Js1wpNQZ6bHI=
+  /yauzl/2.10.0:
+    dependencies:
+      buffer-crc32: 0.2.13
+      fd-slicer: 1.1.0
+    dev: false
+    resolution:
+      integrity: sha1-x+sXyT4RLLEIb6bY5R+wZnt5pfk=
 specifiers:
   '@types/es6-shim': ^0.31.36
   '@types/node': ^9.4.7
+  '@types/yauzl': ^2.9.1
   rollup: ^1.20.3
+  rollup-plugin-json: ^4.0.0
   rollup-plugin-sourcemaps: ^0.4.2
   rollup-plugin-typescript2: ^0.24.0
-  tslib: ^1.9.3
+  tslib: ^1.10.0
   typescript: ^3.6.2
+  yauzl: ^2.10.0

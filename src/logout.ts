@@ -9,7 +9,7 @@ export async function logout(ctx: Context, opts): Promise<void>{
     try {
         await prepareDirs(ctx);
         await umgr.loadFromFile();
-        var user = umgr.mojangUser(opts.uname);
+        var user = umgr.getMojangUser(opts.uname);
         await umgr.logoutUser(user, () => {
             return ctx.readInput(`password for ${user.email}:`, true);
         });

@@ -45,10 +45,9 @@ export function writeFile(fn: fs.PathLike, s: any){
         });
     });
 }
-export function exec(cmd: string, stdout, stderr){
-    let cmds = cmd.split(/[ ]+/g);
+export function exec(cmd: string, args: string[], stdout, stderr){
     return new Promise(function(acc, reject){
-        let p = cpc.spawn(cmds[0], cmds.slice(1));
+        let p = cpc.spawn(cmd, args);
         p.stdout.pipe(stdout);
         p.stderr.pipe(stderr);
         p.on('exit', () => acc());

@@ -35,18 +35,17 @@ export class UserManager{
         return true;
     }
     async save(){
-        // var fn = this.ctx.getLauncherDir() + '/' + this.saveFileName;
         let fn = pathd.join(this.ctx.getLauncherDir(), this.saveFileName);
         let log = this.ctx.log;
         await p.writeFile(fn, JSON.stringify(this.users));
         log.v('user file saved');
         return true;
     }
-    offlineUser(uname: string){
+    getOfflineUser(uname: string){
         // offline users neednt be saved.
         return new OfflineUser(uname);
     }
-    mojangUser(email: string): MojangUser{
+    getMojangUser(email: string): MojangUser{
         return this.users[email] || new MojangUser({email: email});
     }
     getUser(email: string): MojangUser{
@@ -57,16 +56,6 @@ export class UserManager{
         return this.save();
     }
     async logoutUser(u: MojangUser, getPass: () => Promise<string>){
-        // async function logout2(pass: string){
-        //     var res = await p.httpsPost(authServerInfo.host, authServerInfo.logout, {
-        //         username: u.email,
-        //         password: pass
-        //     });
-        //     if(res !== ''){
-        //         throw JSON.parse(res).errorMessage;
-        //     }
-        //     return true;
-        // }
         var cela = this;
         var log = this.ctx.log;
         if(await u.validAndRefresh(this.ctx)){
@@ -75,7 +64,6 @@ export class UserManager{
         }
         else {
             log.i('user is not valid, logging out using password');
-            // await logout2(await getPass());
             let res = await p.httpsPost(authServerInfo.host, authServerInfo.logout, {
                 username: u.email,
                 password: await getPass()
@@ -198,20 +186,11 @@ class MojangUser extends User{
     }
     async makeValid(ctx: Context, version: string, getPass: () => Promise<string>){
         var log = ctx.log;
-        // var cela = this;
-        // async function login1(){
-        //     var pass = await getPass();
-        //     log.i('logging in');
-        //     await cela.login(pass, version);
-        //     log.i('logging in successful');
-        //     return true;
-        // }
         if(await this.validAndRefresh(ctx)){
             log.i('user is valid');
         }
         else {
             log.i('user is invalid, login required');
-            // return login1();
             let pass = await getPass();
             log.i('logging in');
             await this.login(pass, version);

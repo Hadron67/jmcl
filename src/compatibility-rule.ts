@@ -45,6 +45,9 @@ export function checkRule(env: MCConfig, rules: CompatibilityRule[]){
             else if (rule.action === 'disallow'){
                 disallowed = true;
             }
+            else {
+                throw new Error(`Unknown action ${rule.action}`);
+            }
         }
     }
     return allowed && !disallowed;

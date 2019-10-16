@@ -1,4 +1,4 @@
-var jmcl = require('../index.js');
+var jmcl = require('../');
 var cli = require('./arg.js');
 var pkg = require('../package.json');
 
@@ -18,6 +18,28 @@ function setVal(name, val){
     return function(data){
         data[name] = val;
     }
+}
+
+function parseArg(argv){
+    let opt = {cmd: null, home: '~', logLevel: 'verbose', errrMsgs: []};
+    function oneArg(name){
+        if (argv.length){
+            return argv.shift();
+        }
+        else {
+            opt.errrMsgs.push(`option ${name} requires one argument`);
+            return null;
+        }
+    }
+    while (argv.length){
+        
+    }
+}
+
+async function launch(ctx, opt){
+    let prc = await jmcl.launch(ctx, opt);
+    prc.stdout.pipe(prc.stdout);
+    
 }
 
 var argParser = cli()
@@ -46,15 +68,13 @@ module.exports = function(argv){
         return -1;
     }
     var ctx = new jmcl.Context(console, opts.logLevel);
-    ctx.launcherName = pkg.name;
-    ctx.launcherVersion = pkg.version;
     if (opts.home !== undefined)
         ctx.config.home = opts.home;
     if (opts.mcRoot !== undefined)
         ctx.config.mcRoot = opts.mcRoot;
     switch(opts.cmd){
         case 'launch':
-            jmcl.launch(ctx, opts);
+            let p = jmcl.launch(ctx, opts);
             break;
         case 'logout':
             jmcl.logout(ctx, opts);

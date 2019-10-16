@@ -4,13 +4,18 @@ import { UserManager, User } from './user';
 import { prepareDirs } from './dirs';
 import * as p from './promise';
 import { Context } from './mcenv';
+import { EventEmitter } from 'events';
+import { join } from 'path';
+import { randHex } from './util';
+import { emptyDir, rmdir } from './fsx';
 
 export interface LaunchOption {
     uname: string;
     version: string;
     offline: boolean;
 }
-export async function launch(ctx: Context, opt: LaunchOption){
+
+export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.ChildProcess>{
     if(!opt.uname){
         throw new Error('user name not present');
     }
@@ -20,58 +25,65 @@ export async function launch(ctx: Context, opt: LaunchOption){
     opt.offline = !!opt.offline;
     var log = ctx.log;
     
-    async function launch1(): Promise<void>{
-        var vmgr = new VersionManager(ctx);
-        var umgr = new UserManager(ctx);
-        var user: User;
-        await prepareDirs(ctx);
-        await umgr.loadFromFile();
-        if(opt.offline){
-            user = umgr.offlineUser(opt.uname);
-        }
-        else {
-            var user2 = umgr.mojangUser(opt.uname);
-            await user2.makeValid(ctx, opt.version, () => ctx.readInput(`password for ${user2.email}:`, true));
-            await umgr.addMojangUser(user2);
-            user = user2;
-        }
-        var v = await vmgr.getVersion(opt.version);
-        var mcargs = v.getArgs(ctx.config);
-        var jars = v.getJars(ctx.config);
-        jars.push(v.getJarName());
-        user.initArg(mcargs);
+    var vmgr = new VersionManager(ctx);
+    var umgr = new UserManager(ctx);
+    var user: User;
+    await prepareDirs(ctx);
+    await umgr.loadFromFile();
+    if(opt.offline){
+        user = umgr.getOfflineUser(opt.uname);
+    }
+    else {
+        var user2 = umgr.getMojangUser(opt.uname);
+        await user2.makeValid(ctx, opt.version, () => ctx.readInput(`password for ${user2.email}:`, true));
+        await umgr.addMojangUser(user2);
+        user = user2;
+    }
+    var v = await vmgr.getVersion(opt.version);
+    var mcargs = v.getArgs(ctx.config);
+    var jars = v.getClasspathJars(ctx.config);
+    jars.push(v.getJarName());
+    user.initArg(mcargs);
 
-        mcargs.arg('classpath', jars.join(':'))
-            .arg('natives_directory', v.getNativeDir())
-            .arg('user_home', ctx.config.home)
+    await p.mkdirIfNotExists(join(ctx.getMCRoot(), 'tmp'), null);
+    let nativesDir = join(ctx.getMCRoot(), 'tmp', randHex(32));
+    while (await p.fileExists(nativesDir)){
+        nativesDir = join(ctx.getMCRoot(), 'tmp', randHex(32));
+    }
+    await p.mkdirIfNotExists(nativesDir, null);
+    log.i('extracting native libraries');
+    await v.extractNatives(nativesDir, ctx.config);
 
-            .arg('launcher_name', ctx.launcherName)
-            .arg('launcher_version', ctx.launcherVersion);
-        
-        log.i('generating arguments');
-        var cmd = [
-            'java',
-            "-Xincgc",
-            '-XX:-UseAdaptiveSizePolicy',
-            '-XX:-OmitStackTraceInFastThrow',
-            '-Xmn128m',
-            '-Xmx2048M',
-            mcargs.jvmArg(),
-            v.getMainClass(),
-            mcargs.gameArg()
-        ];
+    mcargs.arg('classpath', jars.join(':'))
+        .arg('natives_directory', nativesDir)
+        .arg('user_home', ctx.config.home)
 
-        log.v(`arguments: ${cmd.join(' ')}`);
+        .arg('launcher_name', ctx.launcherName)
+        .arg('launcher_version', ctx.launcherVersion);
     
-        log.i('launching game');
-        let prc = await p.exec(cmd.join(' '), process.stdout, process.stderr);
-        log.i('game quit');
-    }
+    log.i('generating arguments');
+    var cmd: string[] = [
+        "-Xincgc",
+        '-XX:-UseAdaptiveSizePolicy',
+        '-XX:-OmitStackTraceInFastThrow',
+        '-Xmn128m',
+        '-Xmx2048M',
+        ...mcargs.jvmArg(),
+        v.getMainClass(),
+        ...mcargs.gameArg()
+    ];
 
-    try {
-        await launch1();
-    }
-    catch(e){
-        log.e(e);
-    }
+    log.v(`arguments: ${cmd.join(' ')}`);
+
+    log.i('launching game');
+    // let prc = await p.exec('java', cmd, process.stdout, process.stderr);
+    let prc = cpc.spawn('java', cmd);
+    prc.stdout.pipe(process.stdout);
+    prc.stderr.pipe(process.stderr);
+    prc.on('exit', async (code, signal) => {
+        log.i('removing temporary files');
+        await emptyDir(nativesDir);
+        await rmdir(nativesDir);
+    });
+    return prc;
 }
