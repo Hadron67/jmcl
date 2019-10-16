@@ -3,13 +3,13 @@ import { UserManager } from "./user";
 import { Context } from "./main";
 
 
-export async function logout(ctx: Context, opts): Promise<void>{
+export async function logout(ctx: Context, uname: string): Promise<void>{
     var log = ctx.log;
     var umgr = new UserManager(ctx);
     try {
         await prepareDirs(ctx);
         await umgr.loadFromFile();
-        var user = umgr.getMojangUser(opts.uname);
+        var user = umgr.getMojangUser(uname);
         await umgr.logoutUser(user, () => {
             return ctx.readInput(`password for ${user.email}:`, true);
         });

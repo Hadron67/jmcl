@@ -6,7 +6,7 @@ export enum LogLevel {
 }
 
 export class Log {
-    constructor(public c: Console, public level: LogLevel = LogLevel.verbose){}
+    constructor(public c: Console, public level: LogLevel = LogLevel.info){}
     i(s){
         this.level <= LogLevel.info && this.c.log('[jmcl/INFO] ' + s);
     }

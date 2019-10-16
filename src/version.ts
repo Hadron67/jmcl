@@ -71,7 +71,7 @@ function excluded(excludes: string[], fname: string){
 }
 async function extractOneLib(ctx: Context, dir: string, libdir: string, lib: DownloadInfo, excludes: string[]){
     const log = ctx.log;
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
         openZip(pathd.join(libdir, lib.path), {lazyEntries: true}, (err, zfile) => {
             if (err) {
                 reject(err);
@@ -126,9 +126,7 @@ function libraryName2Path(name: string){
     let classv = parts[2];
     return pathd.join(pkg, clazz, classv, `${clazz}-${classv}.jar`);
 }
-function getLibraryPathFromDowloadInfo(name: string, d: DownloadInfo){
-    return d.path ? d.path : libraryName2Path(name);
-}
+
 class Version {
     constructor(public mgr: VersionManager, public vname: string, public versionJson: VersionData){
         //todo: inherits from
@@ -149,15 +147,11 @@ class Version {
                     path = libraryName2Path(lib.name);
                 }
                 ret.push(
-                    // pathd.join(libdir, pkg, clazz, classv, `${clazz}-${classv}.jar`)
                     pathd.join(libdir, path)
                 );
             }
         }
         return ret;
-    }
-    getNativeDir(){
-        return pathd.join(this.mgr.ctx.getVersionDir(this.vname), this.vname + '-natives/');
     }
     async extractNatives(dir: string, cfg: MCConfig){
         let os = getOS().osName;

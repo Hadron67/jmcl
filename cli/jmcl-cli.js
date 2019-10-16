@@ -1,85 +1,141 @@
 var jmcl = require('../');
 var cli = require('./arg.js');
 var pkg = require('../package.json');
+const os = require('os');
 
-function oneArg(name){
-    return function(data, arg){
-        data[name] = arg();
-    }
-}
+const help = 
+`Usage: ${pkg.name} [options] <command> [command options]
 
-function boolArg(name){
-    return function(data){
-        data[name] = true;
-    }
-}
+options: 
+    -d, --dir <dir>:      Set game directory, default to '.minecraft';
+    -h, --home <dir>:     Set home directory, default to os.homedir();
+    --logLevel <level>:   Set logging level, where <level> is 
+                              one of verbose, info, warn, err, default
+                              to info;
+    --help                Print this help text and exit;
+    -v, --version         Display version and exit.
 
-function setVal(name, val){
-    return function(data){
-        data[name] = val;
-    }
-}
+Commands:
+    ${pkg.name} launch -u(--user) <email address or user name> -v(--version) <version> [--offline]
+        Launch Minecraft <version>;
+    ${pkg.name} logout -u(--user) <email>
+        Invalidate all access tokens of <email>.
+`;
 
-function parseArg(argv){
-    let opt = {cmd: null, home: '~', logLevel: 'verbose', errrMsgs: []};
-    function oneArg(name){
+async function main(argv){
+    let errMsgs = [];
+    let cmd, home = os.homedir(), gameDir = '.minecraft', logLevel = 'info';
+    function oneArg(){
+        let name = argv.shift();
         if (argv.length){
             return argv.shift();
         }
         else {
-            opt.errrMsgs.push(`option ${name} requires one argument`);
+            errMsgs.push(`option ${name} requires one argument`);
             return null;
         }
     }
+    out:
     while (argv.length){
-        
+        switch(argv[0]){
+            case '-d':
+            case '--dir':
+                gameDir = oneArg();
+                break;
+            case '--home':
+            case '-h':
+                home = oneArg();
+                break;
+            case '--help':
+                argv.shift();
+                console.log(help);
+                return 0;
+            case '-v':
+            case '--version':
+                argv.shift();
+                console.log(pkg.version);
+                return 0;
+            case '--logLevel':
+                logLevel = oneArg();
+                break;
+            default:
+                cmd = argv.shift();
+                break out;
+        }
     }
+
+    let ctx = new jmcl.Context(console, logLevel);
+    if (home !== void 0)
+        ctx.config.home = home;
+    if (gameDir !== void 0)
+        ctx.config.mcRoot = gameDir;
+
+    if (cmd === 'launch'){
+        let uname, version, offline = false;
+        while (argv.length){
+            switch (argv[0]){
+                case '-u':
+                case '--user':
+                    uname = oneArg();
+                    break;
+                case '-v':
+                case '--version':
+                    version = oneArg();
+                    break;
+                case '--offline':
+                    argv.shift();
+                    offline = true;
+                    break;
+                default:
+                    errMsgs.push(`Unknown option ${argv[0]}`);
+                    argv.shift();
+            }
+        }
+        uname || errMsgs.push('User name missing');
+        version || errMsgs.push('Version missing');
+        if (!errMsgs.length){
+            let prc = await jmcl.launch(ctx, {uname, version, offline});
+            return new Promise((resolve, reject) => {
+                prc.on('exit', (code) => resolve(code));
+            });
+        }
+    }
+    else if (cmd === 'logout'){
+        let uname;
+        while (argv.length){
+            switch (argv[0]){
+                case '-u':
+                case '--user':
+                    uname = oneArg();
+                    break;
+                default:
+                    errMsgs.push(`Unknown option ${argv[0]}`);
+                    argv.shift();
+            }
+        }
+        uname || errMsgs.push('User name missing');
+        if (!errMsgs.length){
+            await jmcl.logout(ctx, uname);
+            return 0;
+        }
+    }
+    else {
+        errMsgs.push(cmd === null ? 'Command missing' : `Unknown command ${cmd}`);
+    }
+
+    for (let e of errMsgs){
+        console.error(e);
+    }
+    console.log(`Try ${pkg.name} --help for help`);
+    return -1;
 }
 
-async function launch(ctx, opt){
-    let prc = await jmcl.launch(ctx, opt);
-    prc.stdout.pipe(prc.stdout);
-    
-}
-
-var argParser = cli()
-    .cmd('launch', 'launching minecraft', setVal('cmd', 'launch'))
-        .opt('-u|--user', 'username or email', oneArg('uname'), true)
-        .opt('-v|--version', 'the version to be launched', oneArg('version'), true)
-        .opt('--offline', 'set user type to offline', setVal('offline', true))
-        
-    .cmd('logout', 'logout a user', setVal('cmd', 'logout'))
-        .opt('-u|--user', 'email of the user', oneArg('uname'), true)
-        
-    .commonOpt('-d|--dir', 'set game directory (default to .minecraft)', oneArg('mcRoot'))
-    .commonOpt('-h|--home', 'set home directory (default to ~)', oneArg('home'))
-    .commonOpt('-l|--logLevel', 'set log level', oneArg('logLevel'));
-
-module.exports = function(argv){
-    var nodeBin = argv.shift();
-    var appName = argv.shift();
-    try{
-        var opts = argParser.parse(argv);
+module.exports = async (argv) => {
+    try {
+        process.exitCode = await main(argv);
     }
     catch(e){
-        e.forEach(function(msg){
-            console.log(msg);
-        });
-        return -1;
+        console.error(e);
+        process.exitCode = -1;
     }
-    var ctx = new jmcl.Context(console, opts.logLevel);
-    if (opts.home !== undefined)
-        ctx.config.home = opts.home;
-    if (opts.mcRoot !== undefined)
-        ctx.config.mcRoot = opts.mcRoot;
-    switch(opts.cmd){
-        case 'launch':
-            let p = jmcl.launch(ctx, opts);
-            break;
-        case 'logout':
-            jmcl.logout(ctx, opts);
-            break;
-        default: console.assert(false);
-    }
-    return 0;
 }

@@ -1,8 +1,10 @@
-# JMCL
+# jmcl
 
-A simple minecraft launcher
+A simple minecraft launcher, allows you to launch Minecraft with one simple command!
 
-## Usage
+## Command line usage
+
+### Launch
 ```sh
 jmcl launch -u <your email> -v <version of minecraft to be launched>
 ```
@@ -18,5 +20,6 @@ jmcl logout -u <your email>
 jmcl launch -u <user name> -v <version of minecraft> --legacy
 ```
 
-### TODO
-* Game download.
+## TODO
+* Game download;
+* Forge/Fabric/third-party client support.

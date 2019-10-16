@@ -8,6 +8,7 @@ import { EventEmitter } from 'events';
 import { join } from 'path';
 import { randHex } from './util';
 import { emptyDir, rmdir } from './fsx';
+import { tmpdir } from 'os';
 
 export interface LaunchOption {
     uname: string;
@@ -45,10 +46,11 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     jars.push(v.getJarName());
     user.initArg(mcargs);
 
-    await p.mkdirIfNotExists(join(ctx.getMCRoot(), 'tmp'), null);
-    let nativesDir = join(ctx.getMCRoot(), 'tmp', randHex(32));
+    let tmpd = join(tmpdir(), 'minecraft-natives');
+    await p.mkdirIfNotExists(tmpd, null);
+    let nativesDir = join(tmpd, randHex(32));
     while (await p.fileExists(nativesDir)){
-        nativesDir = join(ctx.getMCRoot(), 'tmp', randHex(32));
+        nativesDir = join(tmpd, randHex(32));
     }
     await p.mkdirIfNotExists(nativesDir, null);
     log.i('extracting native libraries');
