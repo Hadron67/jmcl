@@ -2,13 +2,13 @@ import * as cpc from 'child_process';
 import { VersionManager } from './version';
 import { UserManager, User } from './user';
 import { prepareDirs } from './dirs';
-import * as p from './promise';
+// import * as p from './promise';
 import { Context } from './mcenv';
-import { EventEmitter } from 'events';
 import { join } from 'path';
 import { randHex } from './util';
-import { emptyDir, rmdir } from './fsx';
 import { tmpdir } from 'os';
+import { remove, ensureDir } from 'fs-extra';
+import { exists } from './fsx';
 
 export interface LaunchOption {
     uname: string;
@@ -41,18 +41,20 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
         user = user2;
     }
     var v = await vmgr.getVersion(opt.version);
+    await v.loadData();
+
     var mcargs = v.getArgs(ctx.config);
     var jars = v.getClasspathJars(ctx.config);
     jars.push(v.getJarName());
     user.initArg(mcargs);
 
     let tmpd = join(tmpdir(), 'minecraft-natives');
-    await p.mkdirIfNotExists(tmpd, null);
+    await ensureDir(tmpd);
     let nativesDir = join(tmpd, randHex(32));
-    while (await p.fileExists(nativesDir)){
+    while (await exists(nativesDir)){
         nativesDir = join(tmpd, randHex(32));
     }
-    await p.mkdirIfNotExists(nativesDir, null);
+    await ensureDir(nativesDir);
     log.i('extracting native libraries');
     await v.extractNatives(nativesDir, ctx.config);
 
@@ -84,8 +86,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     prc.stderr.pipe(process.stderr);
     prc.on('exit', async (code, signal) => {
         log.i('removing temporary files');
-        await emptyDir(nativesDir);
-        await rmdir(nativesDir);
+        await remove(nativesDir);
     });
     return prc;
 }

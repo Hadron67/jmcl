@@ -1,25 +1,63 @@
 import { Context, MCConfig } from './mcenv.js';
 import { LegacyMCArg, MCArg, ArgumentJson, NewMCArg } from './mcarg.js';
-import * as p from './promise';
 import { CompatibilityRule, checkRule } from './compatibility-rule.js';
 import * as pathd from 'path';
 import * as fs from 'fs';
 import { open as openZip } from 'yauzl';
 import { getOS } from './osutil.js';
+import { exists, readFile, writeFile, fileSHA1 } from './fsx.js';
+import { httpsGet, download } from './ajax.js';
+import { URL } from 'url';
+import { ensureDir } from 'fs-extra';
+import { sha1sum } from './util.js';
+import { createDownloader } from './download.js';
 
-const launcherMetaURL = 'launchermeta.mojang.com';
+const launcherMetaURL = new URL('https://launchermeta.mojang.com/mc/game/version_manifest.json');
+const libDownloadURL = 'https://libraries.minecraft.net/';
+const assetDownloadURL = 'https://resources.download.minecraft.net/';
+
+interface VersionInfo {
+    id: string;
+    type: "snapshot" | "release"| "old_beta" | "old_alpha";
+    time: string;
+    releaseTime: string;
+    url: string;
+};
+interface VersionManifest {
+    __comment?: string;
+    latest: { snapshot: string, release: string };
+    versions: VersionInfo[];
+}
 
 class VersionManager {
     versions: {[v: string]: Version} = {};
+    versionManifest: VersionManifest = null;
     constructor(public ctx: Context){}
     async getVersion(vname: string): Promise<Version>{
         var ret = this.versions[vname];
         var cela = this;
         if(!ret){
-            let jsonPath = pathd.join(this.ctx.getVersionDir(vname), vname + '.json');
-            ret = cela.versions[vname] = new Version(cela, vname, JSON.parse(await p.readFile(jsonPath)));
+            // let jsonPath = pathd.join(this.ctx.getVersionDir(vname), vname + '.json');
+            // ret = cela.versions[vname] = new Version(cela, vname, JSON.parse(await p.readFile(jsonPath)));
+            ret = this.versions[vname] = new Version(cela, vname);
         }
         return ret;
+    }
+    private async _getManifest(){
+        if (this.versionManifest === null){
+            this.ctx.log.i('fetching version manifest');
+            this.versionManifest = JSON.parse(await httpsGet(launcherMetaURL));
+        }
+    }
+    async getVersionInfo(vname: string): Promise<VersionInfo>{
+        await this._getManifest();
+        for (let v of this.versionManifest.versions){
+            if (v.id === vname){
+                return v;
+            }
+        }
+        this.ctx.log.i(`version ${vname} not found in version manifest`);
+        return null;
     }
 }
 interface DownloadInfo {
@@ -55,24 +93,42 @@ interface VersionData {
     minecraftArguments?: string;
     arguments?: ArgumentJson;
     assets: string;
+    assetIndex: {
+        id: string;
+        url: string;
+        size: number;
+        totalSize: number;
+        sha1: string;
+        known?: boolean; // XXX: Don't known what's this field for
+    };
     type: string;
     logging: {
         client: LoggingInfo
     };
     jar?: string;
 }
+
+interface AssetEntry {
+    hash: string;// sha1
+    size: number;
+};
+
+interface AssetsData {
+    objects: {[name: string]: AssetEntry};
+};
+
 function excluded(excludes: string[], fname: string){
     for (let e of excludes){
-        if (fname.startsWith(e)){
+        if (e.endsWith('/') && fname.startsWith(e) || fname === e){
             return true;
         }
     }
     return false;
 }
-async function extractOneLib(ctx: Context, dir: string, libdir: string, lib: DownloadInfo, excludes: string[]){
+async function extractOneLib(ctx: Context, dir: string, libdir: string, libPath: string, excludes: string[]){
     const log = ctx.log;
     return new Promise<void>((resolve, reject) => {
-        openZip(pathd.join(libdir, lib.path), {lazyEntries: true}, (err, zfile) => {
+        openZip(pathd.join(libdir, libPath), {lazyEntries: true}, (err, zfile) => {
             if (err) {
                 reject(err);
             }
@@ -83,7 +139,7 @@ async function extractOneLib(ctx: Context, dir: string, libdir: string, lib: Dow
                         return;
                     }
                     if (!entry.fileName.endsWith('/')){
-                        log.v(`Extracting ${entry.fileName} from ${pathd.basename(lib.path)}.`);
+                        log.v(`Extracting ${entry.fileName} from ${pathd.basename(libPath)}.`);
                         zfile.openReadStream(entry, (err, s) => {
                             if (err){
                                 reject(err);
@@ -119,17 +175,158 @@ async function extractOneLib(ctx: Context, dir: string, libdir: string, lib: Dow
 function checkLibrary(lib: LibraryData, cfg: MCConfig){
     return !lib.rules || checkRule(cfg, lib.rules);
 }
-function libraryName2Path(name: string){
+function libraryName2Path(name: string, native: string){
     let parts = name.split(':');
     let pkg = pathd.join(...parts[0].split(/\./g));
     let clazz = parts[1];
     let classv = parts[2];
-    return pathd.join(pkg, clazz, classv, `${clazz}-${classv}.jar`);
+    return [pkg, clazz, classv, native ? `${clazz}-${classv}-${native}.jar` : `${clazz}-${classv}.jar`];
+}
+function getLibraryPath(lib: LibraryData){
+    if (lib.downloads && lib.downloads.artifact && lib.downloads.artifact.path){
+        return lib.downloads.artifact.path.split('/');
+    }
+    else {
+        return libraryName2Path(lib.name, null);
+    }
+}
+function getNativeLibraryPath(lib: LibraryData, os: string){
+    if (lib.natives && lib.natives.hasOwnProperty(os)){
+        const nativeString = lib.natives[os];
+        if (lib.downloads && lib.downloads.classifiers){
+            return lib.downloads.classifiers[nativeString].path.split('/') || libraryName2Path(lib.name, nativeString);
+        }
+        else {
+            return libraryName2Path(lib.name, nativeString);
+        }
+    }
+    else {
+        return null;
+    }
+}
+async function needDownloadLib(lib: LibraryData, libpath: string){
+    if (lib.downloads && lib.downloads.artifact){
+        const sha1 = lib.downloads.artifact.sha1;
+        if (await exists(libpath) && sha1 === await fileSHA1(libpath)){
+            return false;
+        }
+    }
+    else {
+        return true;
+    }
+}
+async function needDownloadNativeLib(lib: LibraryData, os: string, libpath: string){
+    if (lib.natives && lib.natives.hasOwnProperty(os)){
+        const ns = lib.natives[os];
+        if (lib.downloads && lib.downloads.classifiers){
+            const sha1 = lib.downloads.classifiers[os].sha1;
+            if (await exists(libpath) && sha1 === await fileSHA1(libpath)){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function getAssetPath(hash: string){
+    return [hash.substr(0, 2), hash];
+}
+async function needDownloadAsset(hash: string, objdir: string){
+    const fn = pathd.join(objdir, ...getAssetPath(hash));
+    if (await exists(fn) && await fileSHA1(fn) === hash){
+        return false;
+    }
+    return true;
 }
 
 class Version {
-    constructor(public mgr: VersionManager, public vname: string, public versionJson: VersionData){
+    public versionJson: VersionData = null;
+    public assetsJson: AssetsData = null;
+    constructor(public mgr: VersionManager, public vname: string){
         //todo: inherits from
+    }
+    async loadData(){
+        const ctx = this.mgr.ctx;
+        const vdir = ctx.getVersionDir(this.vname);
+        await ensureDir(vdir);
+        if (this.versionJson === null){
+            let jsonPath = pathd.join(vdir, this.vname + '.json');
+            if (!await exists(jsonPath)){
+                const info = await this.mgr.getVersionInfo(this.vname);
+                const rawJson = await httpsGet(new URL(info.url));
+                await writeFile(jsonPath, rawJson);
+                this.versionJson = JSON.parse(rawJson);
+                ctx.log.i('saved version file');
+            }
+            else {
+                ctx.log.i('reading version file');
+                this.versionJson = JSON.parse(await readFile(jsonPath));
+            }
+        }
+    }
+    async validateLibs(){
+        let ctx = this.mgr.ctx;
+        let tasks: string[][] = [];
+
+        const os = getOS().osName;
+        const libdir = pathd.join(ctx.getMCRoot(), 'libraries');
+        await ensureDir(libdir);
+        for (const lib of this.versionJson.libraries){
+            const libpath = getLibraryPath(lib);
+            const nativeLibPath = getNativeLibraryPath(lib, os);
+            needDownloadLib(lib, pathd.join(...libpath)) && tasks.push(libpath);
+            needDownloadNativeLib(lib, os, pathd.join(...nativeLibPath)) && tasks.push(nativeLibPath);
+        }
+
+        let downloader = createDownloader(ctx.config.downloadConcurrentLimit);
+        let count = 0;
+        for (let libpath of tasks){
+            const url = new URL(libDownloadURL + '/' + libpath.join('/'));
+            const savePath = pathd.join(libdir, ...libpath);
+            await downloader.task(url, savePath, {
+                onDone() { ctx.log.i(`(${1 + count++}/${tasks.length}) Downloaded library ${libpath[libpath.length - 1]}`); },
+                onError(){ ctx.log.e(`(${1 + count++}/${tasks.length}) Failed to downloaded library ${libpath[libpath.length - 1]}`); }
+            });
+        }
+    }
+    async validateAssets(){
+        async function downloadOne(hash: string){
+            ctx.log.i(`(${1 + downloaded++}/${tasks.length}) Downloading asset ${hash}`);
+            let res = await download(new URL(assetDownloadURL + '/' + getAssetPath(hash).join('/')));
+            const savePath = pathd.join(objdir, hash.substr(0, 2), hash);
+            await ensureDir(pathd.dirname(savePath));
+            let fd = fs.createWriteStream(savePath);
+            res.pipe(fd);
+            return new Promise((resolve, reject) => {
+                res.on('end', () => resolve());
+                res.on('error', e => reject(e));
+            });
+        }
+        let downloaded = 0;
+        let tasks: Promise<any>[] = [];
+        const ctx = this.mgr.ctx;
+        const aindex = this.versionJson.assetIndex;
+        const objdir = pathd.join(ctx.getMCRoot(), 'assets', 'objects');
+        if (this.assetsJson === null){
+            const jsonPath = pathd.join(ctx.getMCRoot(), 'assets', 'indexes', this.versionJson.assets + '.json');
+            let rawJson: string;
+            if (await exists(jsonPath) && sha1sum(rawJson = await readFile(jsonPath)) === aindex.sha1){
+                this.assetsJson = JSON.parse(rawJson);
+            }
+            else {
+                ctx.log.i(`Downloading assets of version ${aindex.id}`);
+                rawJson = await httpsGet(new URL(aindex.url));
+                await ensureDir(pathd.dirname(jsonPath));
+                await writeFile(jsonPath, rawJson);
+                this.assetsJson = JSON.parse(rawJson);
+            }
+        }
+        for (const name in this.assetsJson.objects){
+            const {size, hash} = this.assetsJson.objects[name];
+            if (needDownloadAsset(hash, objdir)){
+                tasks.push(downloadOne(hash));
+            }
+        }
     }
     getClasspathJars(cfg: MCConfig): string[]{
         let libdir = pathd.join(this.mgr.ctx.getMCRoot(), 'libraries');
@@ -139,15 +336,8 @@ class Version {
 
             if (!libs.hasOwnProperty(lib.name) && checkLibrary(lib, cfg)){
                 libs[lib.name] = true;
-                let path: string;
-                if (lib.downloads && lib.downloads.artifact && lib.downloads.artifact.path){
-                    path = lib.downloads.artifact.path;
-                }
-                else {
-                    path = libraryName2Path(lib.name);
-                }
                 ret.push(
-                    pathd.join(libdir, path)
+                    pathd.join(libdir, ...getLibraryPath(lib))
                 );
             }
         }
@@ -157,9 +347,9 @@ class Version {
         let os = getOS().osName;
         let libdir = pathd.join(this.mgr.ctx.getMCRoot(), 'libraries');
         for (let lib of this.versionJson.libraries){
-            if (lib.natives && lib.natives.hasOwnProperty(os) && checkLibrary(lib, cfg)){
-                let libData = lib.downloads.classifiers[lib.natives[os]];
-                await extractOneLib(this.mgr.ctx, dir, libdir, libData, lib.extract ? lib.extract.exclude : []);
+            const libPath = getNativeLibraryPath(lib, os);
+            if (libPath && checkLibrary(lib, cfg)){
+                await extractOneLib(this.mgr.ctx, dir, libdir, pathd.join(...libPath), lib.extract ? lib.extract.exclude : []);
             }
         }
     }
@@ -171,7 +361,7 @@ class Version {
     }
     getArgs(cfg: MCConfig): MCArg{
         var arg: MCArg;
-        if('minecraftArguments' in this.versionJson){
+        if(this.versionJson.hasOwnProperty('minecraftArguments')){
             arg = new LegacyMCArg(this.versionJson.minecraftArguments);
         }
         else {
@@ -193,13 +383,13 @@ class Version {
     }
 }
 
-interface VersionManifest {
-    __comment?: string,
-    latest: { snapshot: string, release: string },
-    versions: { id: string, type: string, time:string, releaseTime: string, url: string }[]
-}
-export async function getVersionManifest(config: MCConfig){
-    return JSON.parse(await p.httpsGet(launcherMetaURL, '/mc/game/version_manifest.json'));
-}
+// interface VersionManifest {
+//     __comment?: string,
+//     latest: { snapshot: string, release: string },
+//     versions: { id: string, type: string, time:string, releaseTime: string, url: string }[]
+// }
+// export async function getVersionManifest(config: MCConfig){
+//     return JSON.parse(await p.httpsGet(launcherMetaURL, '/mc/game/version_manifest.json'));
+// }
 
 export { VersionManager }

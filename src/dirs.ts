@@ -1,8 +1,9 @@
-import * as p from './promise';
 import { Context } from './main';
+import { ensureDir } from 'fs-extra';
 
 export async function prepareDirs(ctx: Context): Promise<void>{
-    await p.mkdirIfNotExists(ctx.getMCRoot(), null);
-    await p.mkdirIfNotExists(ctx.getLauncherDir(), null);
+    await ensureDir(ctx.getMCRoot(), null);
+    await ensureDir(ctx.getLauncherDir(), null);
+    await ensureDir(ctx.getVersionDir(), null);
     return;
 }

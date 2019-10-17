@@ -1,6 +1,6 @@
 import * as os from 'os';
 import { Log, LogLevel } from './log';
-import { input } from './promise';
+import { input } from './input';
 import * as pathd from 'path';
 import * as pkg from '../package.json';
 
@@ -10,6 +10,7 @@ export interface MCConfig {
     mcRoot: string;
     resolution: number[];
     isDemo: boolean;
+    downloadConcurrentLimit: number;
 }
 
 export class Context {
@@ -18,7 +19,9 @@ export class Context {
         home: '~',
         mcRoot: '.minecraft',
         resolution: null,
-        isDemo: false
+        isDemo: false,
+
+        downloadConcurrentLimit: 50
     };
     launcherName: string;
     launcherVersion: string;
@@ -33,8 +36,9 @@ export class Context {
     getMCRoot(){
         return pathd.join(this.config.home, this.config.mcRoot);
     }
-    getVersionDir(vname: string){
-        return pathd.join(this.config.home, this.config.mcRoot, 'versions', vname);
+    getVersionDir(vname?: string){
+        const vd = pathd.join(this.config.home, this.config.mcRoot, 'versions');
+        return vname ? pathd.join(vd, vname) : vd;
     }
     getLauncherDir(){
         return pathd.join(this.config.home, this.config.mcRoot, this.config.launcherRoot);

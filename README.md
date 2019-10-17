@@ -6,18 +6,15 @@ A simple minecraft launcher, allows you to launch Minecraft with one simple comm
 
 ### Launch
 ```sh
-jmcl launch -u <your email> -v <version of minecraft to be launched>
+jmcl launch -u <uname> -v <version of minecraft to be launched> 
 ```
-It will prompt you to enter password if this is first run.
+It will prompt you to enter password if this is first run, where `<uname>` is the email address of your Mojang(Yggrasil) account.
+
+Add `--offline` option to launch in offline mode, in which case `<uname>` should be in-game user name. ~~Should I remove this option to support Mojang?~~
 
 ### Logout
 ```sh
 jmcl logout -u <your email>
-```
-
-### Launch in offline mode
-```sh
-jmcl launch -u <user name> -v <version of minecraft> --legacy
 ```
 
 ## TODO

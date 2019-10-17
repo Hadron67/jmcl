@@ -1,17 +1,21 @@
 import { Context } from './mcenv';
 import { randHex } from './util';
-import * as p from './promise';
+// import * as p from './promise';
 import { LegacyMCArg, MCArg } from './mcarg';
 import * as pathd from 'path';
+import { URL } from 'url';
+import { httpsPost } from './ajax';
+import { readFile, exists, writeFile } from './fsx';
 
 const authServerInfo = {
-    host: 'authserver.mojang.com',
+    host: 'https://authserver.mojang.com',
     validate: '/validate',
     login: '/authenticate',
     refresh: '/refresh',
     invalidate: '/invalidate',
     logout: '/signout'
 };
+
 export class UserManager{
     users: {[s: string]: MojangUser} = {};
     saveFileName = 'users.json';
@@ -20,9 +24,9 @@ export class UserManager{
         // var fn = this.ctx.getLauncherDir() + '/' + this.saveFileName;
         let fn = pathd.join(this.ctx.getLauncherDir(), this.saveFileName);
         // var cela = this;
-        if(await p.fileExists(fn)){
+        if(await exists(fn)){
             this.ctx.log.i('user file exists, reading');
-            var us = JSON.parse(await p.readFile(fn)) as {[s: string]: MojangUserData};
+            var us = JSON.parse(await readFile(fn)) as {[s: string]: MojangUserData};
             for(var name in us){
                 var u = us[name];
                 this.users[name] = new MojangUser(u);
@@ -37,7 +41,7 @@ export class UserManager{
     async save(){
         let fn = pathd.join(this.ctx.getLauncherDir(), this.saveFileName);
         let log = this.ctx.log;
-        await p.writeFile(fn, JSON.stringify(this.users));
+        await writeFile(fn, JSON.stringify(this.users));
         log.v('user file saved');
         return true;
     }
@@ -64,7 +68,7 @@ export class UserManager{
         }
         else {
             log.i('user is not valid, logging out using password');
-            let res = await p.httpsPost(authServerInfo.host, authServerInfo.logout, {
+            let res = await httpsPost(new URL(authServerInfo.host + authServerInfo.logout), {
                 username: u.email,
                 password: await getPass()
             });
@@ -140,7 +144,7 @@ class MojangUser extends User{
     needsLogin(){ return this.accessToken === ''; }
     async login(pass: string, version: string = '1.0'){
         var cela = this;
-        var resRaw = await p.httpsPost(authServerInfo.host, authServerInfo.login, {
+        var resRaw = await httpsPost(new URL(authServerInfo.host + authServerInfo.login), {
             username: this.email,
             password: pass,
             clientToken: this.clientToken,
@@ -165,7 +169,7 @@ class MojangUser extends User{
     }
     async validate(){
         var cela = this;
-        return '' === await p.httpsPost(authServerInfo.host, authServerInfo.validate, {
+        return '' === await httpsPost(new URL(authServerInfo.host + authServerInfo.validate), {
             clientToken: this.clientToken,
             accessToken: this.accessToken
         });
@@ -200,7 +204,7 @@ class MojangUser extends User{
     }
     async refresh(){
         var cela = this;
-        var resRaw = await p.httpsPost(authServerInfo.host, authServerInfo.refresh, {
+        var resRaw = await httpsPost(new URL(authServerInfo.host + authServerInfo.refresh), {
             clientToken: this.clientToken,
             accessToken: this.accessToken,
             selectedProfile: null, //this.selectedProfile,
@@ -222,7 +226,7 @@ class MojangUser extends User{
         return true;
     }
     async logout(){
-        var res = await p.httpsPost(authServerInfo.host, authServerInfo.invalidate, {
+        var res = await httpsPost(new URL(authServerInfo.host + authServerInfo.invalidate), {
             accessToken: this.accessToken,
             clientToken: this.clientToken
         });
