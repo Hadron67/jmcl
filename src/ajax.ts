@@ -32,18 +32,7 @@ export function ajax(opt: AjaxOptions): Promise<string>{
         req.end();
     }) as Promise<string>;
 }
-export function download(url: URL){
-    return new Promise<IncomingMessage>((resolve, reject) => {
-        let req = request({
-            host: url.hostname,
-            port: 443,
-            path: url.pathname,
-            method: 'GET'
-        }, res => resolve(res));
-        req.on('error', e => reject(e));
-        req.end();
-    });
-}
+
 export function httpsGet(url: URL): Promise<string>{
     return ajax({
         url,

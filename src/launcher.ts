@@ -1,8 +1,6 @@
 import * as cpc from 'child_process';
 import { VersionManager } from './version';
 import { UserManager, User } from './user';
-import { prepareDirs } from './dirs';
-// import * as p from './promise';
 import { Context } from './mcenv';
 import { join } from 'path';
 import { randHex } from './util';
@@ -29,7 +27,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     var vmgr = new VersionManager(ctx);
     var umgr = new UserManager(ctx);
     var user: User;
-    await prepareDirs(ctx);
+    await ctx.prepareDirs();
 
     var v = await vmgr.getVersion(opt.version);
     await v.loadData(false);
@@ -83,7 +81,9 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
 
     log.i('launching game');
     // let prc = await p.exec('java', cmd, process.stdout, process.stderr);
-    let prc = cpc.spawn('java', cmd);
+    let prc = cpc.spawn('java', cmd, {
+        cwd: ctx.getMCRoot()
+    });
     prc.stdout.pipe(process.stdout);
     prc.stderr.pipe(process.stderr);
     prc.on('exit', async (code, signal) => {

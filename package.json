@@ -1,6 +1,6 @@
 {
   "name": "jmcl",
-  "version": "0.2.5",
+  "version": "0.3",
   "description": "Simple minecraft launcher",
   "main": "lib/jmcl.js",
   "bin": {
@@ -40,6 +40,7 @@
   },
   "homepage": "https://github.com/Hadron67/jmcl#readme",
   "dependencies": {
+    "chalk": "^2.4.2",
     "fs-extra": "^8.1.0",
     "yauzl": "^2.10.0"
   }

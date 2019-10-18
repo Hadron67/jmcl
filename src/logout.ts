@@ -1,4 +1,3 @@
-import { prepareDirs } from "./dirs";
 import { UserManager } from "./user";
 import { Context } from "./main";
 
@@ -7,7 +6,7 @@ export async function logout(ctx: Context, uname: string): Promise<void>{
     var log = ctx.log;
     var umgr = new UserManager(ctx);
     try {
-        await prepareDirs(ctx);
+        await ctx.prepareDirs();
         await umgr.loadFromFile();
         var user = umgr.getMojangUser(uname);
         await umgr.logoutUser(user, () => {
