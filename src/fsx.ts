@@ -51,6 +51,7 @@ export function fileSHA1(f: fs.PathLike){
             hash.end();
             resolve(hash.read().toString('hex'));
         });
+        fd.pipe(hash);
     });
 }
 // function ls(dir: string): Promise<FileInfo[]> {

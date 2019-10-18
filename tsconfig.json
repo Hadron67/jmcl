@@ -15,5 +15,5 @@
     ],
     "exclude": [
         "typings/browser.d.ts"
-    ],
+    ]
 }

@@ -1,6 +1,8 @@
 import { download } from './ajax';
 import { URL } from 'url';
 import { createWriteStream } from 'fs';
+import { ensureDir } from 'fs-extra';
+import { dirname } from 'path';
 
 class TaskNode {
     prev: TaskNode = null;
@@ -38,7 +40,8 @@ export function createDownloader(limit: number): Downloader{
         }
         else {
             taskCount++;
-            tasks.push(download(url).then(res => {
+            tasks.push(download(url).then(async (res) => {
+                await ensureDir(dirname(path));
                 res.pipe(createWriteStream(path));
                 return new Promise<void>((resolve, reject) => {
                     res.on('end', () => {
@@ -62,4 +65,22 @@ export function createDownloader(limit: number): Downloader{
     return {
         task, wait
     }
+}
+
+export interface DownloadTask {
+    url: URL;
+    savePath: string;
+};
+
+export async function downloadAll(){
+
+}
+
+export async function downloadToFile(url: URL, path: string){
+    const res = await download(url);
+    return new Promise<void>((resolve, reject) => {
+        res.pipe(createWriteStream(path));
+        res.on('end', () => resolve());
+        res.on('error', e => reject(e));
+    });
 }

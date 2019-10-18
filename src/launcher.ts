@@ -30,6 +30,10 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     var umgr = new UserManager(ctx);
     var user: User;
     await prepareDirs(ctx);
+
+    var v = await vmgr.getVersion(opt.version);
+    await v.loadData(false);
+
     await umgr.loadFromFile();
     if(opt.offline){
         user = umgr.getOfflineUser(opt.uname);
@@ -40,8 +44,6 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
         await umgr.addMojangUser(user2);
         user = user2;
     }
-    var v = await vmgr.getVersion(opt.version);
-    await v.loadData();
 
     var mcargs = v.getArgs(ctx.config);
     var jars = v.getClasspathJars(ctx.config);

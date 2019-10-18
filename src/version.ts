@@ -13,8 +13,8 @@ import { sha1sum } from './util.js';
 import { createDownloader } from './download.js';
 
 const launcherMetaURL = new URL('https://launchermeta.mojang.com/mc/game/version_manifest.json');
-const libDownloadURL = 'https://libraries.minecraft.net/';
-const assetDownloadURL = 'https://resources.download.minecraft.net/';
+const libDownloadURL = 'https://libraries.minecraft.net';
+const assetDownloadURL = 'https://resources.download.minecraft.net';
 
 interface VersionInfo {
     id: string;
@@ -56,7 +56,7 @@ class VersionManager {
                 return v;
             }
         }
-        this.ctx.log.i(`version ${vname} not found in version manifest`);
+        this.ctx.log.e(`version ${vname} not found in version manifest`);
         return null;
     }
 }
@@ -101,9 +101,15 @@ interface VersionData {
         sha1: string;
         known?: boolean; // XXX: Don't known what's this field for
     };
+    downloads: {
+        client: DownloadInfo;
+        client_mappings: DownloadInfo;
+        server: DownloadInfo;
+        server_mappings: DownloadInfo;
+    };
     type: string;
     logging: {
-        client: LoggingInfo
+        client: LoggingInfo;
     };
     jar?: string;
 }
@@ -211,15 +217,13 @@ async function needDownloadLib(lib: LibraryData, libpath: string){
             return false;
         }
     }
-    else {
-        return true;
-    }
+    return true;
 }
 async function needDownloadNativeLib(lib: LibraryData, os: string, libpath: string){
     if (lib.natives && lib.natives.hasOwnProperty(os)){
         const ns = lib.natives[os];
         if (lib.downloads && lib.downloads.classifiers){
-            const sha1 = lib.downloads.classifiers[os].sha1;
+            const sha1 = lib.downloads.classifiers[ns].sha1;
             if (await exists(libpath) && sha1 === await fileSHA1(libpath)){
                 return false;
             }
@@ -243,24 +247,64 @@ class Version {
     public versionJson: VersionData = null;
     public assetsJson: AssetsData = null;
     constructor(public mgr: VersionManager, public vname: string){
-        //todo: inherits from
     }
-    async loadData(){
+    async loadData(download: boolean){
         const ctx = this.mgr.ctx;
         const vdir = ctx.getVersionDir(this.vname);
-        await ensureDir(vdir);
         if (this.versionJson === null){
             let jsonPath = pathd.join(vdir, this.vname + '.json');
             if (!await exists(jsonPath)){
-                const info = await this.mgr.getVersionInfo(this.vname);
-                const rawJson = await httpsGet(new URL(info.url));
-                await writeFile(jsonPath, rawJson);
-                this.versionJson = JSON.parse(rawJson);
-                ctx.log.i('saved version file');
+                if (download){
+                    const info = await this.mgr.getVersionInfo(this.vname);
+                    if (info === null){
+                        throw new Error(`Version ${this.vname} not found in version manifest.`);
+                    }
+                    ctx.log.i(`Downloading version json for ${this.vname}`);
+                    const rawJson = await httpsGet(new URL(info.url));
+                    await ensureDir(vdir);
+                    await writeFile(jsonPath, rawJson);
+                    this.versionJson = JSON.parse(rawJson);
+                    ctx.log.i('saved version file');
+                }
+                else {
+                    throw new Error(`Version ${this.vname} json file not found, try downloading this version first.`);
+                }
             }
             else {
                 ctx.log.i('reading version file');
                 this.versionJson = JSON.parse(await readFile(jsonPath));
+            }
+        }
+        //todo: inherits from
+    }
+    async validateAll(){
+        await this.validateLibs();
+        await this.validateAssets();
+        await this.validateJar();
+    }
+    async validateJar(){
+        const ctx = this.mgr.ctx;
+        if (this.versionJson.jar && this.versionJson.jar !== this.vname){
+            const nv = await this.mgr.getVersion(this.versionJson.jar);
+            await nv.loadData(true);
+            await nv.validateJar();
+        }
+        else {
+            const vdir = ctx.getVersionDir(this.vname);
+            const jarPath = pathd.join(vdir, this.vname + '.jar');
+            const dinfo = this.versionJson.downloads.client;
+            if (await exists(jarPath) && dinfo.sha1 === await fileSHA1(jarPath)){
+                return;
+            }
+            else {
+                ctx.log.i(`Downloading jar for ${this.vname}`);
+                await ensureDir(vdir);
+                const res = await download(new URL(dinfo.url));
+                return new Promise<void>((resolve, reject) => {
+                    res.pipe(fs.createWriteStream(jarPath));
+                    res.on('end', () => resolve());
+                    res.on('error', e => reject(e));
+                });
             }
         }
     }
@@ -274,36 +318,27 @@ class Version {
         for (const lib of this.versionJson.libraries){
             const libpath = getLibraryPath(lib);
             const nativeLibPath = getNativeLibraryPath(lib, os);
-            needDownloadLib(lib, pathd.join(...libpath)) && tasks.push(libpath);
-            needDownloadNativeLib(lib, os, pathd.join(...nativeLibPath)) && tasks.push(nativeLibPath);
+            (await needDownloadLib(lib, pathd.join(libdir, ...libpath))) && tasks.push(libpath);
+            nativeLibPath && (await needDownloadNativeLib(lib, os, pathd.join(libdir, ...nativeLibPath))) && tasks.push(nativeLibPath);
         }
 
-        let downloader = createDownloader(ctx.config.downloadConcurrentLimit);
-        let count = 0;
-        for (let libpath of tasks){
-            const url = new URL(libDownloadURL + '/' + libpath.join('/'));
-            const savePath = pathd.join(libdir, ...libpath);
-            await downloader.task(url, savePath, {
-                onDone() { ctx.log.i(`(${1 + count++}/${tasks.length}) Downloaded library ${libpath[libpath.length - 1]}`); },
-                onError(){ ctx.log.e(`(${1 + count++}/${tasks.length}) Failed to downloaded library ${libpath[libpath.length - 1]}`); }
-            });
+        if (tasks.length){
+            let downloader = createDownloader(ctx.config.downloadConcurrentLimit);
+            let count = 0;
+            ctx.log.i('Downloading libraries');
+            for (let libpath of tasks){
+                const url = new URL(libDownloadURL + '/' + libpath.join('/'));
+                const savePath = pathd.join(libdir, ...libpath);
+                await downloader.task(url, savePath, {
+                    onDone() { ctx.log.i(`(${1 + count++}/${tasks.length}) Downloaded library ${libpath[libpath.length - 1]}`); },
+                    onError(){ ctx.log.e(`(${1 + count++}/${tasks.length}) Failed to downloaded library ${libpath[libpath.length - 1]}`); }
+                });
+            }
+            await downloader.wait();
         }
     }
     async validateAssets(){
-        async function downloadOne(hash: string){
-            ctx.log.i(`(${1 + downloaded++}/${tasks.length}) Downloading asset ${hash}`);
-            let res = await download(new URL(assetDownloadURL + '/' + getAssetPath(hash).join('/')));
-            const savePath = pathd.join(objdir, hash.substr(0, 2), hash);
-            await ensureDir(pathd.dirname(savePath));
-            let fd = fs.createWriteStream(savePath);
-            res.pipe(fd);
-            return new Promise((resolve, reject) => {
-                res.on('end', () => resolve());
-                res.on('error', e => reject(e));
-            });
-        }
-        let downloaded = 0;
-        let tasks: Promise<any>[] = [];
+        let tasks: {name: string, hash: string}[] = [];
         const ctx = this.mgr.ctx;
         const aindex = this.versionJson.assetIndex;
         const objdir = pathd.join(ctx.getMCRoot(), 'assets', 'objects');
@@ -314,7 +349,7 @@ class Version {
                 this.assetsJson = JSON.parse(rawJson);
             }
             else {
-                ctx.log.i(`Downloading assets of version ${aindex.id}`);
+                ctx.log.i(`Downloading asset index of version ${aindex.id}`);
                 rawJson = await httpsGet(new URL(aindex.url));
                 await ensureDir(pathd.dirname(jsonPath));
                 await writeFile(jsonPath, rawJson);
@@ -323,9 +358,25 @@ class Version {
         }
         for (const name in this.assetsJson.objects){
             const {size, hash} = this.assetsJson.objects[name];
-            if (needDownloadAsset(hash, objdir)){
-                tasks.push(downloadOne(hash));
+            if (await needDownloadAsset(hash, objdir)){
+                tasks.push({name, hash});
             }
+        }
+
+        if (tasks.length){
+            let count = 0;
+            let downloader = createDownloader(ctx.config.downloadConcurrentLimit);
+            ctx.log.i('Downloading assets');
+            for (const {hash, name} of tasks){
+                const p = getAssetPath(hash);
+                const url = new URL(assetDownloadURL + '/' + p.join('/'));
+                const savePath = pathd.join(objdir, ...p);
+                await downloader.task(url, savePath, {
+                    onDone() { ctx.log.i(`(${1 + count++}/${tasks.length}) Downloaded asset ${name}`); },
+                    onError(){ ctx.log.e(`(${1 + count++}/${tasks.length}) Failed to downloaded asset ${name}`); }
+                });
+            }
+            await downloader.wait();
         }
     }
     getClasspathJars(cfg: MCConfig): string[]{

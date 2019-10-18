@@ -119,6 +119,15 @@ async function main(argv){
             return 0;
         }
     }
+    else if (cmd === 'install'){
+        if (argv.length){
+            await jmcl.install(ctx, argv.shift());
+            return 0;
+        }
+        else {
+            errMsgs.push('Version missing');
+        }
+    }
     else {
         errMsgs.push(cmd === null ? 'Command missing' : `Unknown command ${cmd}`);
     }
