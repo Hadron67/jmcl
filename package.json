@@ -1,7 +1,7 @@
 {
   "name": "jmcl",
   "version": "0.3",
-  "description": "Simple minecraft launcher",
+  "description": "Simple minecraft launcher and version manager",
   "main": "lib/jmcl.js",
   "bin": {
     "jmcl": "bin/jmcl"

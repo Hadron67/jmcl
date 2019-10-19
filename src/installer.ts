@@ -1,12 +1,18 @@
 import { Context } from "./mcenv";
 import { VersionManager } from "./version";
 
-export async function install(ctx: Context, vname: string){
+export async function install(ctx: Context, vname: string, redownloadLib: boolean){
     const log = ctx.log;
     await ctx.prepareDirs();
     const vmgr = new VersionManager(ctx);
-    const v = await vmgr.getVersion(vname);
-    await v.loadData(true);
-    await v.validateAll();
+    const v = vmgr.getVersion(vname);
+    if (await v.isVanillaVersion()){
+        v.markRefresh();
+    }
+    else {
+        ctx.log.w(`${vname} is not Vanilla, I might run into trooble`);
+    }
+    await v.loadData();
+    await v.validateAll(redownloadLib);
     log.i('Done');
 }

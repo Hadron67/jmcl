@@ -7,11 +7,13 @@ import { randHex } from './util';
 import { tmpdir } from 'os';
 import { remove, ensureDir } from 'fs-extra';
 import { exists } from './fsx';
+import { createPipeServer } from './server';
 
 export interface LaunchOption {
     uname: string;
     version: string;
     offline: boolean;
+    pipeServerPort: number;
 }
 
 export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.ChildProcess>{
@@ -29,8 +31,8 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     var user: User;
     await ctx.prepareDirs();
 
-    var v = await vmgr.getVersion(opt.version);
-    await v.loadData(false);
+    var v = vmgr.getVersion(opt.version);
+    await v.loadData();
 
     await umgr.loadFromFile();
     if(opt.offline){
@@ -45,7 +47,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
 
     var mcargs = v.getArgs(ctx.config);
     var jars = v.getClasspathJars(ctx.config);
-    jars.push(v.getJarName());
+    // jars.push(v.getJarName());
     user.initArg(mcargs);
 
     let tmpd = join(tmpdir(), 'minecraft-natives');
@@ -90,5 +92,21 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
         log.i('removing temporary files');
         await remove(nativesDir);
     });
+    
+    if (opt.pipeServerPort){
+        const s = createPipeServer();
+        prc.stdout.on('data', d => s.write(d.toString('utf-8')));
+        s.listen(opt.pipeServerPort);
+        ctx.log.i(`Pipe server started on port ${opt.pipeServerPort}`);
+        prc.on('exit', (code, signal) => {
+            log.i('Stopping pipe server');
+            s.stop(e => {
+                if (e){
+                    ctx.log.e('Error while stopping pipe server:' + e);
+                }
+            });
+        });
+    }
+
     return prc;
 }

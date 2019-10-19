@@ -31,7 +31,7 @@ export class Context {
     constructor(public console: Console, logLevel: string){
         this.log = new Log(console, LogLevel[logLevel]);
         this.config.home = os.homedir();
-        this.config.mcRoot = pathd.join(this.config.home, '.minecraft');
+        this.config.mcRoot = process.env['MINECRAFT_HOME'] || pathd.join(this.config.home, '.minecraft');
         this.launcherName = pkg.name;
         this.launcherVersion = pkg.version;
     }

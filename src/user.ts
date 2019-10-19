@@ -5,7 +5,7 @@ import { LegacyMCArg, MCArg } from './mcarg';
 import * as pathd from 'path';
 import { URL } from 'url';
 import { httpsPost } from './ajax';
-import { readFile, exists, writeFile } from './fsx';
+import { readFile, exists, writeFile, chmod } from './fsx';
 
 const authServerInfo = {
     host: 'https://authserver.mojang.com',
@@ -42,6 +42,7 @@ export class UserManager{
         let fn = pathd.join(this.ctx.getLauncherDir(), this.saveFileName);
         let log = this.ctx.log;
         await writeFile(fn, JSON.stringify(this.users));
+        await chmod(fn, 0o600);
         log.v('user file saved');
         return true;
     }

@@ -29,7 +29,11 @@ export function exists(fn: fs.PathLike): Promise<boolean>{
         fs.exists(fn, exi => acc(exi));
     });
 }
-
+export function chmod(fn: fs.PathLike, mode: number){
+    return new Promise<void>((resolve, reject) => {
+        fs.chmod(fn, mode, err => err ? reject(err) : resolve());
+    });
+}
 export function readFile(fn: fs.PathLike): Promise<string>{
     return new Promise<string>(function(acc, reject){
         fs.readFile(fn, function(err, data){

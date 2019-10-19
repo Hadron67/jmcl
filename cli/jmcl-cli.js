@@ -8,7 +8,7 @@ const help =
 `Usage: ${pkg.name} [options] <command> [command options]
 
 options: 
-    -d, --dir <dir>:      Game directory, default to os.homedir()/.minecraft;
+    -d, --dir <dir>:      Game directory, default to $MINECRAFT_HOME, or os.homedir()/.minecraft if $MINECRAFT_HOME is not set;
     -h, --home <dir>:     Home directory, default to os.homedir();
     --climit <limit>:     Maximum number of concurrent connections used when downloading; 
     --logLevel <level>:   Logging level, where <level> is 
@@ -18,16 +18,20 @@ options:
     -v, --version         Display version and exit.
 
 Commands:
-    ${pkg.name} launch -u(--user) <email address or user name> -v(--version) <version> [--offline]
-        Launch Minecraft <version>;
+    ${pkg.name} launch -u(--user) <email address or user name> -v(--version) <version> [--offline] [--pipes [<port>]]
+        Launch Minecraft <version>. Add option --pipes to open a local TCP server and 
+        write all log output of Minecraft to it;
 
     ${pkg.name} logout <email>
         Invalidate all access tokens of <email>;
 
-    ${pkg.name} install <version>
-        Install Minecraft <version>, or download missing game files of <version> if already installed;
+    ${pkg.name} install <version> [--redownload]
+        Install Minecraft <version>, or download missing game files of <version> if already installed.
+        A game file with bad check sum would be re-downloaded, but for those without check sums, they
+        will be downloaded only when they are missing, use --redownload to re-download all files without
+        check sum information;
     
-    ${pkg.name} install-all
+    ${pkg.name} install-all [--redownload]
         Check and download missing game files of all installed versions;
     
     ${pkg.name} remove <version>
@@ -36,6 +40,12 @@ Commands:
     
     ${pkg.name} cleanup
         Delete game files that're not used by any installed Minecraft version.
+    
+    ${pkg.name} list
+        List all installed versions.
+    
+    ${pkg.name} list-all [--release]
+        List all available verions(verions present in verion manifest).
 `;
 
 async function main(argv){
@@ -92,7 +102,7 @@ async function main(argv){
     ctx.config.downloadConcurrentLimit = climit;
 
     if (cmd === 'launch'){
-        let uname, version, offline = false;
+        let uname, version, offline = false, pipeServerPort = null;
         while (argv.length){
             switch (argv[0]){
                 case '-u':
@@ -107,6 +117,13 @@ async function main(argv){
                     argv.shift();
                     offline = true;
                     break;
+                case '--pipes':
+                    argv.shift();
+                    pipeServerPort = 35194;
+                    if (argv.length && /[0-9]+/.test(argv[0])){
+                        pipeServerPort = Number(argv.shift());
+                    }
+                    break;
                 default:
                     errMsgs.push(`Unknown option ${argv[0]}`);
                     argv.shift();
@@ -115,7 +132,7 @@ async function main(argv){
         uname || errMsgs.push('User name missing');
         version || errMsgs.push('Version missing');
         if (!errMsgs.length){
-            let prc = await jmcl.launch(ctx, {uname, version, offline});
+            let prc = await jmcl.launch(ctx, {uname, version, offline, pipeServerPort});
             return new Promise((resolve, reject) => {
                 prc.on('exit', (code) => resolve(code));
             });
@@ -131,8 +148,19 @@ async function main(argv){
         }
     }
     else if (cmd === 'install'){
-        if (argv.length){
-            await jmcl.install(ctx, argv.shift());
+        let redownload = false, version = null;
+        while (argv.length){
+            switch (argv[0]){
+                case '--redownload':
+                    redownload = true;
+                    argv.shift();
+                    break;
+                default:
+                    version = argv.shift();
+            }
+        }
+        if (version){
+            await jmcl.install(ctx, version, redownload);
             return 0;
         }
         else {
@@ -150,10 +178,14 @@ async function main(argv){
         }
     }
     else if (cmd === 'install-all'){
+        let redownload = false;
+        if (argv.length && argv[0] === '--redownload'){
+            redownload = true;
+        }
         await ctx.prepareDirs();
         const vm = new jmcl.VersionManager(ctx);
         await vm.loadAllVersions(true);
-        await vm.validateAllVersions();
+        await vm.validateAllVersions(redownload);
         return 0;
     }
     else if (cmd === 'list'){
@@ -164,6 +196,40 @@ async function main(argv){
             console.log('-   ' + chalk.bold(v));
         }
         return 0;
+    }
+    else if (cmd === 'list-all'){
+        let releaseOnly = false;
+        while (argv.length){
+            switch (argv[0]){
+                case '--release':
+                    argv.shift();
+                    releaseOnly = true;
+                    break;
+                default:
+                    errMsgs.push(`Unknown option ${argv[0]}`);
+                    argv.shift();
+            }
+        }
+        if (errMsgs.length === 0){
+            const vm = new jmcl.VersionManager(ctx);
+            let verions = await vm.getAvailableVersions();
+
+            if (releaseOnly){
+                verions = verions.filter(v => v.type === "release");
+            }
+
+            const installed = Array(verions.length);
+            const latest = await vm.getLatest();
+            await Promise.all(verions.map(async (v, i) => installed[i] = await vm.isInstalled(v.id)));
+            for (let _a = verions, i = _a.length - 1; i >= 0; i--){
+                let tag = '', v = verions[i];
+                installed[i] && (tag += chalk.blue('[installed]'));
+                latest.release === v.id && (tag += chalk.green('[latest]'));
+                latest.snapshot === v.id && (tag += chalk.yellow('[latest snapshot]'));
+                console.log("-   " + chalk.bold(`${v.id} `) + tag);
+            }
+            return 0;
+        }
     }
     else if (cmd === 'cleanup'){
         await ctx.prepareDirs();
