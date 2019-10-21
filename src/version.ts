@@ -356,8 +356,10 @@ function getLibraryPath(lib: LibraryData){
 function getNativeLibraryPath(lib: LibraryData, os: string){
     if (lib.natives && lib.natives.hasOwnProperty(os)){
         const nativeString = lib.natives[os];
-        if (lib.downloads && lib.downloads.classifiers){
-            return pathd.normalize(lib.downloads.classifiers[nativeString].path) || pathd.join(...libraryName2Path(lib.name, nativeString));
+        if (lib.downloads){
+            if (lib.downloads.classifiers && lib.downloads.classifiers[nativeString]){
+                return pathd.normalize(lib.downloads.classifiers[nativeString].path) || pathd.join(...libraryName2Path(lib.name, nativeString));
+            }
         }
         else {
             return pathd.join(...libraryName2Path(lib.name, nativeString));
