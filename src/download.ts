@@ -19,17 +19,32 @@ interface DownloadProgressListener {
 export interface DownloadTask {
     url: URL;
     savePath: string;
+    hash?: string;
 };
 
 export function downloadNP(url: URL, cb: (err: Error, res: IncomingMessage) => any){
-    let req = request({
-        host: url.hostname,
-        port: 443,
-        path: url.pathname,
-        method: 'GET'
-    }, res => { cb && cb(null, res); cb = null; });
-    req.on('error', e => { cb && cb(e, null); cb = null; });
-    req.end();
+    function downloadOne(url: URL, cb: (err: Error, res: IncomingMessage) => any){
+        let req = request({
+            host: url.hostname,
+            port: 443,
+            path: url.pathname + url.search,
+            method: 'GET'
+        }, res => {
+            if (cb){
+                if (res.statusCode === 302 && res.headers.location){
+                    downloadOne(new URL(res.headers.location), cb);
+                }
+                else {
+                    cb(null, res);
+                }
+                cb = null;
+            }
+        });
+        req.on('error', e => { cb && cb(e, null); cb = null; });
+        req.end();
+    }
+
+    downloadOne(url, cb);
 }
 
 export function downloadToFileNP(url: URL, path: string, preg: DownloadProgressListener, cb: (err: Error) => any){
@@ -70,7 +85,7 @@ export function download(url: URL){
     });
 }
 
-export function downloadAll(tasks: DownloadTask[], limit: number, lis: DownloadListener){
+export async function downloadAll(tasks: DownloadTask[], limit: number, lis: DownloadListener){
     let sendPtr = 0, doneCount = 0;
     let workers: Promise<void>[] = [];
     let errors: Error[] = [];
@@ -100,10 +115,9 @@ export function downloadAll(tasks: DownloadTask[], limit: number, lis: DownloadL
         workers.push(new Promise<void>(worker));
     }
 
-    return Promise.all(workers).then(() => {
-        if (errors.length){
-            throw new Error('Failed to download some files');
-        }
-    });
+    await Promise.all(workers);
+    if (errors.length) {
+        throw new Error('Failed to download some files');
+    }
 }
 

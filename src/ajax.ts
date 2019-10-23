@@ -1,4 +1,4 @@
-import { request } from 'https';
+import { request, RequestOptions } from 'https';
 import { URL } from 'url';
 import { Stream } from 'stream';
 import { IncomingMessage } from 'http';
@@ -13,7 +13,7 @@ export interface AjaxOptions {
     body?: string;
 }
 export function ajax(opt: AjaxOptions): Promise<string>{
-    var reqOpt = {
+    var reqOpt: RequestOptions = {
         host: opt.url.hostname,
         port: opt.port,
         path: opt.url.pathname,

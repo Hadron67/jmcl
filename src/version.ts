@@ -681,8 +681,12 @@ class Version {
     getJarName(){
         let vp: Version = this;
         while (vp){
+            const vd = this.mgr.ctx.getVersionDir(vp.vname);
             if (vp.versionJson.downloads && vp.versionJson.downloads.client){
-                return pathd.join(this.mgr.ctx.getVersionDir(vp.vname), vp.vname + '.jar');
+                return pathd.join(vd, vp.vname + '.jar');
+            }
+            if (vp.versionJson.jar){
+                return pathd.join(this.mgr.ctx.getVersionDir(vp.versionJson.jar), vp.versionJson.jar + '.jar');
             }
             vp = vp._parent;
         }
