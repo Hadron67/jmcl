@@ -728,6 +728,11 @@ class Version {
 
         var env = this.mgr.ctx;
         let assetsDir = pathd.join(env.getMCRoot(), 'assets');
+
+        if (cfg.resolution){
+            arg.arg('resolution_width', cfg.resolution[0].toString());
+            arg.arg('resolution_height', cfg.resolution[1].toString());
+        }
         // Uncommenting the following line would make the console log output of Minecraft in xml.
         // let logging = this.versionJson.logging.client;
         // arg.appendRaw(logging.argument.replace(/\${path}/g, pathd.join(assetsDir, 'log_configs', logging.file.id)));

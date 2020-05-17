@@ -124,6 +124,16 @@ async function main(argv){
                         pipeServerPort = Number(argv.shift());
                     }
                     break;
+                case '--res':
+                    argv.shift();
+                    if (/^[0-9]+x[0-9]+$/.test(argv[0])){
+                        ctx.config.resolution = argv[0].split('x').map(r => Number(r));
+                    }
+                    else {
+                        errMsgs.push(`Invalid resolution ${argv[0]}`);
+                    }
+                    argv.shift();
+                    break;
                 default:
                     errMsgs.push(`Unknown option ${argv[0]}`);
                     argv.shift();

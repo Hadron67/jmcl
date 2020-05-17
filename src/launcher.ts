@@ -69,7 +69,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     
     log.i('generating arguments');
     var cmd: string[] = [
-        "-Xincgc",
+        "-XX:+UseConcMarkSweepGC",
         '-XX:-UseAdaptiveSizePolicy',
         '-XX:-OmitStackTraceInFastThrow',
         '-Xmn128m',
