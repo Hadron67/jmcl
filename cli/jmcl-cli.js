@@ -1,6 +1,5 @@
-var jmcl = require('../');
-var cli = require('./arg.js');
-var pkg = require('../package.json');
+const jmcl = require('../');
+const pkg = require('../package.json');
 const os = require('os');
 const chalk = require('chalk');
 
@@ -18,7 +17,7 @@ options:
     -v, --version         Display version and exit.
 
 Commands:
-    ${pkg.name} launch -u(--user) <email address or user name> -v(--version) <version> [--offline] [--pipes [<port>]]
+    ${pkg.name} launch [<jvm args>] -u(--user) <email address or user name> -v(--version) <version> [--offline] [--pipes [<port>]]
         Launch Minecraft <version>. Add option --pipes to open a local TCP server and 
         write all log output of Minecraft to it;
 
@@ -47,6 +46,10 @@ Commands:
     ${pkg.name} list-all [--release]
         List all available verions(verions present in verion manifest).
 `;
+
+function isJvmArg(a){
+    return a.startsWith('-D') || a.startsWith('-X') || a.startsWith('+XX:');
+}
 
 async function main(argv){
     let errMsgs = [];
@@ -102,7 +105,8 @@ async function main(argv){
     ctx.config.downloadConcurrentLimit = climit;
 
     if (cmd === 'launch'){
-        let uname, version, offline = false, pipeServerPort = null;
+        let uname, version, offline = false, pipeServerPort = null, javaPath = '';
+        const jvmArgs = [];
         while (argv.length){
             switch (argv[0]){
                 case '-u':
@@ -116,6 +120,9 @@ async function main(argv){
                 case '--offline':
                     argv.shift();
                     offline = true;
+                    break;
+                case '--java':
+                    javaPath = oneArg();
                     break;
                 case '--pipes':
                     argv.shift();
@@ -135,14 +142,20 @@ async function main(argv){
                     argv.shift();
                     break;
                 default:
-                    errMsgs.push(`Unknown option ${argv[0]}`);
-                    argv.shift();
+                    if (isJvmArg(argv[0])){
+                        jvmArgs.push(argv[0]);
+                        argv.shift();
+                    }
+                    else {
+                        errMsgs.push(`Unknown option ${argv[0]}`);
+                        argv.shift();
+                    }
             }
         }
         uname || errMsgs.push('User name missing');
         version || errMsgs.push('Version missing');
         if (!errMsgs.length){
-            let prc = await jmcl.launch(ctx, {uname, version, offline, pipeServerPort});
+            let prc = await jmcl.launch(ctx, {uname, version, offline, pipeServerPort, jvmArgs, javaPath});
             return new Promise((resolve, reject) => {
                 prc.on('exit', (code) => resolve(code));
             });
@@ -235,7 +248,7 @@ async function main(argv){
                 let tag = '', v = verions[i];
                 installed[i] && (tag += chalk.blue('[installed]'));
                 latest.release === v.id && (tag += chalk.green('[latest]'));
-                latest.snapshot === v.id && (tag += chalk.yellow('[latest snapshot]'));
+                latest.release !== latest.snapshot && latest.snapshot === v.id && (tag += chalk.yellow('[latest snapshot]'));
                 console.log("-   " + chalk.bold(`${v.id} `) + tag);
             }
             return 0;

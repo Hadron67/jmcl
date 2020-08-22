@@ -10,10 +10,12 @@ import { exists } from './fsx';
 import { createPipeServer } from './server';
 
 export interface LaunchOption {
+    javaPath: string;
     uname: string;
     version: string;
     offline: boolean;
     pipeServerPort: number;
+    jvmArgs: string[];
 }
 
 export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.ChildProcess>{
@@ -69,11 +71,11 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     
     log.i('generating arguments');
     var cmd: string[] = [
-        "-XX:+UseConcMarkSweepGC",
         '-XX:-UseAdaptiveSizePolicy',
         '-XX:-OmitStackTraceInFastThrow',
         '-Xmn128m',
         '-Xmx2048M',
+        ...opt.jvmArgs,
         ...mcargs.jvmArg(),
         v.getMainClass(),
         ...mcargs.gameArg()
@@ -83,7 +85,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
 
     log.i('launching game');
     // let prc = await p.exec('java', cmd, process.stdout, process.stderr);
-    let prc = cpc.spawn('java', cmd, {
+    let prc = cpc.spawn(opt.javaPath || 'java', cmd, {
         cwd: ctx.getMCRoot()
     });
     prc.stdout.pipe(process.stdout);
