@@ -38,18 +38,17 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
 
     await umgr.loadFromFile();
     if(opt.offline){
-        user = umgr.getOfflineUser(opt.uname);
+        user = umgr.newOfflineUser(opt.uname);
     }
     else {
-        var user2 = umgr.getMojangUser(opt.uname);
-        await user2.makeValid(ctx, opt.version, () => ctx.readInput(`password for ${user2.email}:`, true));
-        await umgr.addMojangUser(user2);
+        var user2 = umgr.getOrCreateUser(opt.uname, 'yggdrasil');
+        await user2.makeValid(ctx, opt.version, () => ctx.readInput(`password for ${opt.uname}:`, true));
+        await umgr.addUser(user2);
         user = user2;
     }
 
     var mcargs = v.getArgs(ctx.config);
     var jars = v.getClasspathJars(ctx.config);
-    // jars.push(v.getJarName());
     user.initArg(mcargs);
 
     let tmpd = join(tmpdir(), 'minecraft-natives');

@@ -603,6 +603,10 @@ class Version {
         }
         this._assetIndexValide = true;
     }
+    getModsDir(){
+        const vd = this.mgr.ctx.getVersionDir(this.vname);
+        return pathd.join(vd, 'mods');
+    }
     async validateAssets(){
         if (this._assetsValide){
             return;
@@ -745,14 +749,5 @@ class Version {
                 .arg('version_type', this.versionJson.type);
     }
 }
-
-// interface VersionManifest {
-//     __comment?: string,
-//     latest: { snapshot: string, release: string },
-//     versions: { id: string, type: string, time:string, releaseTime: string, url: string }[]
-// }
-// export async function getVersionManifest(config: MCConfig){
-//     return JSON.parse(await p.httpsGet(launcherMetaURL, '/mc/game/version_manifest.json'));
-// }
 
 export { VersionManager }

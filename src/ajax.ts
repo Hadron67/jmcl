@@ -30,18 +30,18 @@ export function ajax(opt: AjaxOptions): Promise<string>{
         req.on('error', e => rej(e));
         opt.body && req.write(opt.body);
         req.end();
-    }) as Promise<string>;
+    });
 }
 
-export function httpsGet(url: URL): Promise<string>{
+export function httpsGet(url: URL, headers: any = {}): Promise<string>{
     return ajax({
         url,
         port: 443,
         method: 'GET',
-        headers: {}
+        headers
     });
 }
-export function httpsPost(url: URL, data: any): Promise<string>{
+export function httpsPost(url: URL, data: any, headers?: any): Promise<string>{
     var postBody = JSON.stringify(data);
     return ajax({
         url,
@@ -49,7 +49,8 @@ export function httpsPost(url: URL, data: any): Promise<string>{
         method: 'POST',
         headers : {
             'Content-Type': 'application/json',
-            'Content-Length': String(postBody.length)
+            'Content-Length': String(postBody.length),
+            ...headers
         },
         body: postBody
     });
