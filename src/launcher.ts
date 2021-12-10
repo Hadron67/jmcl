@@ -27,7 +27,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     }
     opt.offline = !!opt.offline;
     var log = ctx.log;
-    
+
     var vmgr = new VersionManager(ctx);
     var umgr = new UserManager(ctx);
     var user: User;
@@ -39,11 +39,10 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     await umgr.loadFromFile();
     if(opt.offline){
         user = umgr.newOfflineUser(opt.uname);
-    }
-    else {
+    } else {
         var user2 = umgr.getOrCreateUser(opt.uname, 'yggdrasil');
         await user2.makeValid(ctx, opt.version, () => ctx.readInput(`password for ${opt.uname}:`, true));
-        await umgr.addUser(user2);
+        await umgr.addUser(opt.uname, user2);
         user = user2;
     }
 

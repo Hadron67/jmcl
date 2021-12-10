@@ -106,7 +106,7 @@ async function main(argv){
 
     if (cmd === 'launch'){
         let uname, version, offline = false, pipeServerPort = null, javaPath = '';
-        const jvmArgs = [];
+        const jvmArgs = ['-Dlog4j2.formatMsgNoLookups=true'];
         while (argv.length){
             switch (argv[0]){
                 case '-u':

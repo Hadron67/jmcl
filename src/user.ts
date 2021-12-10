@@ -78,8 +78,8 @@ export class UserManager{
     getUser(email: string): User {
         return this.users[email];
     }
-    async addUser(u: User){
-        this.users[u.getName()] = u;
+    async addUser(id: string, u: User){
+        this.users[id] = u;
         return this.save();
     }
     async logoutUser(u: MojangUser, getPass: () => Promise<string>){
