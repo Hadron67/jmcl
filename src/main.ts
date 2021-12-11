@@ -2,12 +2,11 @@ import chalk from 'chalk';
 import * as pkg from '../package.json';
 import { install } from './installer';
 import { launch } from './launcher';
-import { logout } from './logout';
 import { Context } from './mcenv';
 import { UserManager } from './user';
 import { VersionManager } from './version';
 
-export { Context, VersionManager, install, logout, launch };
+export { Context, VersionManager, install, launch };
 export { UserManager } from './user';
 
 const help =
@@ -172,13 +171,6 @@ export async function main(argv: string[], errMsgs: string[]): Promise<void> {
                 prc.on('exit', (code) => resolve());
             });
         }
-    } else if (cmd === 'logout'){
-        if (argv.length){
-            await logout(ctx, argv[0]);
-            return;
-        } else {
-            errMsgs.push('User name missing');
-        }
     } else if (cmd === 'install'){
         let redownload = false, version = null;
         while (argv.length){
@@ -293,6 +285,7 @@ export async function main(argv: string[], errMsgs: string[]): Promise<void> {
                 }
                 await user.makeValid(() => ctx.readInput(`password for ${user.getAccountName()}:`, true), async () => { await um.save(); }, ctx.log);
                 await um.save();
+                ctx.log.i(`Validated, user name: ${user.getName()}`);
                 break;
             }
             case 'logout': {
@@ -312,6 +305,7 @@ export async function main(argv: string[], errMsgs: string[]): Promise<void> {
                     errMsgs.push(`Unknown user "${userName}"`);
                     throw '';
                 }
+                await um.save();
                 ctx.log.i(`removed user "${userName}"`);
                 break;
             }
@@ -332,7 +326,7 @@ export async function main(argv: string[], errMsgs: string[]): Promise<void> {
                 break;
             }
             case 'list': {
-                um.forEach((id, u) => console.log(`-    ${id} account: ${u.getAccountName()}, type: ${u.getType()}`));
+                um.forEach((id, u) => console.log(`-    ${id}, account: ${u.getAccountName()}, name: ${u.getName() || '<unavailable>'}, type: ${u.getType()}`));
                 break;
             }
             default: errMsgs.push(`Unknown subcommand "${subcmd}" for user`); throw 'help';

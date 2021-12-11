@@ -4,16 +4,11 @@ import { httpsGet, httpsPost } from "./ajax";
 import { Log } from "./log";
 import { UserProfile } from "./user";
 
-const XSTSRelyingParty = 'rp://api.minecraftservices.com/';
-const xboxAuthServerInfo = {
-    host: "https://api.minecraftservices.com/authentication",
-    logWithXBox: '/login_with_xbox',
-    entitlements: '/mcstore',
-    profile: '/profile'
-};
-const xboxLiveAuth = 'https://user.auth.xboxlive.com/user/authenticate';
-const xstsAuth = 'https://xsts.auth.xboxlive.com/xsts/authorize';
-const loginWithXboxPath = 'https://api.minecraftservices.com/authentication/login_with_xbox';
+const XSTS_RELYING_PARTY = 'rp://api.minecraftservices.com/';
+const XBOXLIVE_AUTH_ENDPOINT = 'https://user.auth.xboxlive.com/user/authenticate';
+const XSTS_AUTH_ENDPOINT = 'https://xsts.auth.xboxlive.com/xsts/authorize';
+const ENDPOINT_LOGIN_WITH_XBOX = 'https://api.minecraftservices.com/authentication/login_with_xbox';
+const ENDPOINT_GET_PROFILE = 'https://api.minecraftservices.com/minecraft/profile';
 const HEADERS = { 'User-Agent': 'jmcl' };
 
 function parseJson(ret: string) {
@@ -24,13 +19,15 @@ function getNow(): number {
     return (new Date().valueOf() / 1000) | 0;
 }
 
-export interface TimedToken {
+interface TimedObject {
     expiresOn: number;
+}
+
+export interface TimedToken extends TimedObject {
     data: string;
 }
 
-interface XBLToken {
-    expiresOn: number;
+interface XBLToken extends TimedObject {
     token: string;
     userHash: string;
 }
@@ -44,7 +41,7 @@ export interface MSACredential {
 }
 
 function getRefreshToken(self: MSACredential, clientId: string): string {
-    const tokens = self.cache.msToken?.RefreshTokens;
+    const tokens = self.cache.msToken?.RefreshToken;
     if (!tokens) return null;
     for (const key in tokens) {
         if (tokens[key].client_id === clientId) return tokens[key].secret;
@@ -115,11 +112,11 @@ async function validateMSAToken(self: MSACredential, logger: Log) {
 }
 
 async function doXBLAuth(accessToken: string): Promise<XBLToken> {
-    const res = await httpsPost(new URL(xboxLiveAuth), {
+    const res = await httpsPost(new URL(XBOXLIVE_AUTH_ENDPOINT), {
         Properties: {
             AuthMethod: "RPS",
             SiteName: "user.auth.xboxlive.com",
-            RpsTicket: "d=" + accessToken // your access token from step 2 here
+            RpsTicket: "d=" + accessToken,
         },
         RelyingParty: "http://auth.xboxlive.com",
         TokenType: "JWT"
@@ -127,86 +124,104 @@ async function doXBLAuth(accessToken: string): Promise<XBLToken> {
     return {
         expiresOn: (new Date(res.NotAfter).valueOf() / 1000) | 0,
         token: res.Token,
-        userHash: res.DisplayClaims.xui.uhs,
+        userHash: res.DisplayClaims.xui[0].uhs,
     };
 }
 
-async function doXSTSAuth(xblToken: XBLToken, relyingParty: string, logger: Log): Promise<TimedToken> {
-    const res = await httpsPost(new URL(xstsAuth), {
+async function doXSTSAuth(xblToken: string, relyingParty: string, logger: Log): Promise<TimedToken> {
+    const res = await httpsPost(new URL(XSTS_AUTH_ENDPOINT), {
         Properties: {
             SandboxId: "RETAIL",
             UserTokens: [
-                xblToken.token
+                xblToken
             ]
         },
         RelyingParty: relyingParty,
         TokenType: "JWT"
-    }).then(parseJson);
-    if (res.XErr) {
-        switch (res.XErr) {
-            case 2148916233: logger.e('No XBox profile associated with the user, signup at https://signup.live.com/signup'); break;
-            case 2148916235: logger.e('XBox Live is not available in your region'); break;
-            default: logger.e(`Failed to login with XBox: ${res.Message}`);
+    }).then(parseJson).catch(res => {
+        if (res.XErr) {
+            switch (res.XErr) {
+                case 2148916233: logger.e('No XBox profile associated with the user, signup at https://signup.live.com/signup'); break;
+                case 2148916235: logger.e('XBox Live is not available in your region'); break;
+                default: logger.e(`Failed to login with XBox: ${res.Message}`);
+            }
         }
         throw new Error(res);
-    } else {
-        return {
-            expiresOn: (new Date(res.NotAfter).valueOf() / 1000) | 0,
-            data: res.Token,
-        };
-    }
+    });
+    return {
+        expiresOn: (new Date(res.NotAfter).valueOf() / 1000) | 0,
+        data: res.Token,
+    };
 }
 
-async function getAccessToken(xstsToken: string, userHash: string): Promise<TimedToken> {
-    const res = await httpsPost(new URL(loginWithXboxPath), {
+async function fetchAccessToken(xstsToken: string, userHash: string): Promise<TimedToken> {
+    const res = await httpsPost(new URL(ENDPOINT_LOGIN_WITH_XBOX), {
         identityToken: `XBL3.0 x=${userHash};${xstsToken}`
     }).then(parseJson);
-    if (res.errorMessage) {
-        throw new Error(res.errorMessage);
-    } else {
-        return {
-            expiresOn: getNow() + res.expires_in,
-            data: res.access_token,
-        };
-    }
+    return {
+        expiresOn: getNow() + res.expires_in,
+        data: res.access_token,
+    };
 }
 
 export async function fetchProfile(accessToken: string): Promise<UserProfile> {
-    const res = await httpsGet(new URL(xboxAuthServerInfo.host + xboxAuthServerInfo.profile), {
+    const res = await httpsGet(new URL(ENDPOINT_GET_PROFILE), {
         Authorization: `Bearer ${accessToken}`
     }).then(parseJson);
-    if (res.errorMessage) {
-        throw new Error(res.errorMessage);
+    return {
+        id: res.id,
+        name: res.name,
+    };
+}
+
+export interface AuthContext {
+    saveUser: () => Promise<void>;
+    logger: Log;
+}
+
+async function getMSAToken(self: MSACredential, ctx: AuthContext): Promise<TimedToken> {
+    if (self.MSAToken && self.MSAToken.expiresOn - getNow() > 1) {
+        return self.MSAToken;
     } else {
-        return {
-            id: res.id,
-            name: res.name,
-        };
+        await validateMSAToken(self, ctx.logger);
+        await ctx.saveUser();
+        return self.MSAToken;
     }
 }
 
-export async function validateMSACredential(self: MSACredential, saveUser: () => Promise<void>, logger: Log) {
-    const now = (new Date().valueOf() / 1000) | 0;
+async function getXBLToken(self: MSACredential, ctx: AuthContext): Promise<XBLToken> {
+    if (self.xblToken && self.xblToken.expiresOn - getNow() > 1) {
+        return self.xblToken;
+    } else {
+        const msaToken = await getMSAToken(self, ctx);
+        ctx.logger.i('Logging in to XBox Live');
+        self.xblToken = await doXBLAuth(msaToken.data);
+        await ctx.saveUser();
+        return self.xblToken;
+    }
+}
 
-    if (self.MSAToken && self.MSAToken.expiresOn - now <= 1) self.MSAToken = null;
-    if (self.xblToken && self.xblToken.expiresOn - now <= 1) self.xblToken = null;
-    if (self.xstsToken && self.xstsToken.expiresOn - now <= 1) self.xstsToken = null;
-    if (self.accessToken && self.accessToken.expiresOn - now <= 1) self.accessToken = null;
-    await validateMSAToken(self, logger);
-    await saveUser();
-    if (self.xblToken === null) {
-        logger.i('Logging in with XBL');
-        self.xblToken = await doXBLAuth(self.MSAToken.data);
-        await saveUser();
+async function getXSTSToken(self: MSACredential, ctx: AuthContext): Promise<TimedToken> {
+    if (self.xstsToken && self.xstsToken.expiresOn - getNow() > 1) {
+        return self.xstsToken;
+    } else {
+        const xblToken = await getXBLToken(self, ctx);
+        ctx.logger.i('Logging in to XSTS');
+        self.xstsToken = await doXSTSAuth(xblToken.token, XSTS_RELYING_PARTY, ctx.logger);
+        await ctx.saveUser();
+        return self.xstsToken;
     }
-    if (self.xstsToken === null) {
-        logger.i('Logging in with XSTS');
-        self.xstsToken = await doXSTSAuth(self.xblToken, XSTSRelyingParty, logger);
-        await saveUser();
-    }
-    if (self.accessToken === null) {
-        logger.i('Obtaining access token');
-        self.accessToken = await getAccessToken(self.xstsToken.data, self.xblToken.userHash);
-        await saveUser();
+}
+
+export async function getAccessToken(self: MSACredential, ctx: AuthContext): Promise<TimedToken> {
+    if (self.accessToken && self.accessToken.expiresOn - getNow() > 1) {
+        return self.accessToken;
+    } else {
+        const xstsToken = await getXSTSToken(self, ctx);
+        const xblToken = await getXBLToken(self, ctx);
+        ctx.logger.i('Obtaining access token');
+        self.accessToken = await fetchAccessToken(xstsToken.data, xblToken.userHash);
+        await ctx.saveUser();
+        return self.accessToken;
     }
 }

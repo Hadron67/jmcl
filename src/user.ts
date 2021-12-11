@@ -6,7 +6,7 @@ import * as pathd from 'path';
 import { URL } from 'url';
 import { httpsGet, httpsPost } from './ajax';
 import { readFile, exists, writeFile, chmod } from './fsx';
-import { createMSACredential, fetchProfile, MSACredential, validateMSACredential } from './msa';
+import { createMSACredential, fetchProfile, MSACredential, getAccessToken as getMSAAccessToken } from './msa';
 import { Log } from './log';
 
 const authServerInfo = {
@@ -25,15 +25,15 @@ export class UserManager {
     async loadFromFile(){
         let fn = pathd.join(this.ctx.getLauncherDir(), this.saveFileName);
         if(await exists(fn)){
-            this.ctx.log.i('user file exists, reading');
+            this.ctx.log.v('user file exists, reading');
             var us = JSON.parse(await readFile(fn)) as {[s: string]: UserStorageData};
             for(var name in us){
                 var u = us[name];
                 this.users[name] = User.fromUserStorage(u);
             }
-            this.ctx.log.i('done loading users');
+            this.ctx.log.v('done loading users');
         } else {
-            this.ctx.log.i('user file not exists, skipping');
+            this.ctx.log.v('user file not exists, skipping');
         }
         return true;
     }
@@ -289,12 +289,12 @@ class XBoxUser extends User {
             credential: this.credential,
         };
     }
-    async makeValid(getPass: () => Promise<string>, saveUser: () => Promise<void>, log: Log): Promise<void> {
+    async makeValid(getPass: () => Promise<string>, saveUser: () => Promise<void>, logger: Log): Promise<void> {
         if (!this.credential) {
             this.credential = createMSACredential();
         }
-        await validateMSACredential(this.credential, saveUser, log);
-        this.profile = await fetchProfile(this.credential.accessToken.data);
+        const accessToken = await getMSAAccessToken(this.credential, { logger, saveUser });
+        this.profile = await fetchProfile(accessToken.data);
     }
     async logout(): Promise<void> {
         // TODO: how to invalidate all tokens?
@@ -303,7 +303,7 @@ class XBoxUser extends User {
     }
     getType() { return "microsoft"; }
     getName(): string {
-        return this.profile.name;
+        return this.profile?.name;
     }
     getUUID(): string {
         return this.profile.id;
