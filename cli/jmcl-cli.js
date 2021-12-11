@@ -106,7 +106,8 @@ async function main(argv){
 
     if (cmd === 'launch'){
         let uname, version, offline = false, pipeServerPort = null, javaPath = '';
-        const jvmArgs = ['-Dlog4j2.formatMsgNoLookups=true'];
+        let log4j2Fix = false;
+        const jvmArgs = [];
         while (argv.length){
             switch (argv[0]){
                 case '-u':
@@ -141,6 +142,10 @@ async function main(argv){
                     }
                     argv.shift();
                     break;
+                case '--log4j2-fix':
+                    argv.shift();
+                    log4j2Fix = true;
+                    break;
                 default:
                     if (isJvmArg(argv[0])){
                         jvmArgs.push(argv[0]);
@@ -155,7 +160,7 @@ async function main(argv){
         uname || errMsgs.push('User name missing');
         version || errMsgs.push('Version missing');
         if (!errMsgs.length){
-            let prc = await jmcl.launch(ctx, {uname, version, offline, pipeServerPort, jvmArgs, javaPath});
+            let prc = await jmcl.launch(ctx, {uname, version, offline, pipeServerPort, jvmArgs, javaPath, log4j2Fix});
             return new Promise((resolve, reject) => {
                 prc.on('exit', (code) => resolve(code));
             });

@@ -30,6 +30,25 @@ interface VersionManifest {
     versions: VersionInfo[];
 }
 
+interface MCVersion {
+    major: number;
+    minor: number;
+    fix?: number;
+}
+
+export function parseVersion(name: string): MCVersion {
+    if (/^[0-9]+\.[0-9]+(\.[0-9]+)?$/.test(name)) {
+        const parts = name.split('.');
+        if (parts.length == 3) {
+            return { major: Number(parts[0]), minor: Number(parts[1]), fix: Number(parts[2]) };
+        } else if (parts.length == 1) {
+            return { major: Number(parts[0]), minor: Number(parts[1]) };
+        } else return null;
+    } else {
+        return null;
+    }
+}
+
 class VersionManager {
     versions: {[v: string]: Version} = {};
     versionManifest: VersionManifest = null;
@@ -432,6 +451,8 @@ interface AssetDownloadTask extends DownloadTask {
 class Version {
     public versionJson: VersionData = null;
     public assetsJson: AssetsData = null;
+    public version: MCVersion;
+    public needLog4j2Fix = false;
     private _parent: Version = null;
     private _needRefresh = false;
 
@@ -440,6 +461,7 @@ class Version {
     private _assetsValide = false;
     private _jarValide = false;
     constructor(public mgr: VersionManager, public vname: string){
+        this.version = parseVersion(vname);
     }
     async versionFileExists(){
         return await exists(pathd.join(this.mgr.ctx.getVersionDir(this.vname), this.vname + '.json'));
@@ -479,10 +501,16 @@ class Version {
                 this.versionJson = JSON.parse(await readFile(jsonPath));
             }
         }
+        if (this.version != null) {
+            if (this.version.major == 1 && this.version.minor >= 12 && this.version.minor <= 16) {
+                this.needLog4j2Fix = true;
+            }
+        }
         //todo: inherits from
         if (this.versionJson.inheritsFrom){
             this._parent = this.mgr.getVersion(this.versionJson.inheritsFrom);
             await this._parent.loadData();
+            this.needLog4j2Fix = this.needLog4j2Fix || this._parent.needLog4j2Fix;
         }
     }
     async validateAll(redownloadLib: boolean){

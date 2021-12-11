@@ -8,6 +8,10 @@ import { tmpdir } from 'os';
 import { remove, ensureDir } from 'fs-extra';
 import { exists } from './fsx';
 import { createPipeServer } from './server';
+import { downloadToFile } from './download';
+import { URL } from 'url';
+
+const LOG4J2_CONFIG_URL = 'https://launcher.mojang.com/v1/objects/02937d122c86ce73319ef9975b58896fc1b491d1/log4j2_112-116.xml';
 
 export interface LaunchOption {
     javaPath: string;
@@ -66,7 +70,19 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
 
         .arg('launcher_name', ctx.launcherName)
         .arg('launcher_version', ctx.launcherVersion);
-    
+
+    if (v.needLog4j2Fix) {
+        log.i(`LOG4J2 fix is required for this version`);
+        const logFileName = join(ctx.getMCRoot(), 'log4j2-fix-log-config.xml');
+        if (!await exists(logFileName)) {
+            log.i('downloading log4j2 config file');
+            await downloadToFile(new URL(LOG4J2_CONFIG_URL), logFileName);
+        }
+        opt.jvmArgs.push(`-Dlog4j.configurationFile=${logFileName}`);
+    } else {
+        opt.jvmArgs.push('-Dlog4j2.formatMsgNoLookups=true');
+    }
+
     log.i('generating arguments');
     var cmd: string[] = [
         '-XX:-UseAdaptiveSizePolicy',
@@ -82,7 +98,6 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     log.v(`arguments: ${cmd.join(' ')}`);
 
     log.i('launching game');
-    // let prc = await p.exec('java', cmd, process.stdout, process.stderr);
     let prc = cpc.spawn(opt.javaPath || 'java', cmd, {
         cwd: ctx.getMCRoot()
     });
