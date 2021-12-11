@@ -20,7 +20,8 @@ export default {
         'crypto',
         'chalk',
         'net',
-        '@xboxreplay/xboxlive-auth'
+        '@xboxreplay/xboxlive-auth',
+        '@azure/msal-node'
     ],
 
     output: [

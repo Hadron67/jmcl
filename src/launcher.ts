@@ -30,31 +30,37 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
         throw new Error('version not given');
     }
     opt.offline = !!opt.offline;
-    var log = ctx.log;
+    const log = ctx.log;
 
-    var vmgr = new VersionManager(ctx);
-    var umgr = new UserManager(ctx);
+    const vmgr = new VersionManager(ctx);
+    const umgr = new UserManager(ctx);
     var user: User;
     await ctx.prepareDirs();
 
-    var v = vmgr.getVersion(opt.version);
+    const v = vmgr.getVersion(opt.version);
     await v.loadData();
 
     await umgr.loadFromFile();
     if(opt.offline){
         user = umgr.newOfflineUser(opt.uname);
     } else {
-        var user2 = umgr.getOrCreateUser(opt.uname, 'yggdrasil');
-        await user2.makeValid(ctx, opt.version, () => ctx.readInput(`password for ${opt.uname}:`, true));
-        await umgr.addUser(opt.uname, user2);
+        var user2 = umgr.getUser(opt.uname);
+        if (user2 === null) {
+            ctx.log.e(`Unknown user ${opt.uname}`);
+            throw '';
+        }
+        await user2.makeValid(() => ctx.readInput(`password for ${opt.uname}:`, true), async () => { await umgr.save(); }, ctx.log);
+        umgr.addUser(opt.uname, user2);
+        await umgr.save();
         user = user2;
     }
+    log.i(`User name is ${user.getName()}`);
 
-    var mcargs = v.getArgs(ctx.config);
-    var jars = v.getClasspathJars(ctx.config);
+    const mcargs = v.getArgs(ctx.config);
+    const jars = v.getClasspathJars(ctx.config);
     user.initArg(mcargs);
 
-    let tmpd = join(tmpdir(), 'minecraft-natives');
+    const tmpd = join(tmpdir(), 'minecraft-natives');
     await ensureDir(tmpd);
     let nativesDir = join(tmpd, randHex(32));
     while (await exists(nativesDir)){
@@ -84,7 +90,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     }
 
     log.i('generating arguments');
-    var cmd: string[] = [
+    const cmd: string[] = [
         '-XX:-UseAdaptiveSizePolicy',
         '-XX:-OmitStackTraceInFastThrow',
         '-Xmn128m',
@@ -98,7 +104,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
     log.v(`arguments: ${cmd.join(' ')}`);
 
     log.i('launching game');
-    let prc = cpc.spawn(opt.javaPath || 'java', cmd, {
+    const prc = cpc.spawn(opt.javaPath || 'java', cmd, {
         cwd: ctx.getMCRoot()
     });
     prc.stdout.pipe(process.stdout);

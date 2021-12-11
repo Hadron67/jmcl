@@ -6,7 +6,8 @@ import * as pathd from 'path';
 import { URL } from 'url';
 import { httpsGet, httpsPost } from './ajax';
 import { readFile, exists, writeFile, chmod } from './fsx';
-import * as XboxLiveAuth from '@xboxreplay/xboxlive-auth';
+import { createMSACredential, fetchProfile, MSACredential, validateMSACredential } from './msa';
+import { Log } from './log';
 
 const authServerInfo = {
     host: 'https://authserver.mojang.com',
@@ -17,15 +18,7 @@ const authServerInfo = {
     logout: '/signout'
 };
 
-const XSTSRelyingParty = 'rp://api.minecraftservices.com/';
-const xboxAuthServerInfo = {
-    host: "https://api.minecraftservices.com/authentication",
-    logWithXBox: '/login_with_xbox',
-    entitlements: '/mcstore',
-    profile: '/profile'
-};
-
-export class UserManager{
+export class UserManager {
     users: {[s: string]: User} = {};
     saveFileName = 'users.json';
     constructor(public ctx: Context){}
@@ -62,87 +55,45 @@ export class UserManager{
     newOfflineUser(uname: string){
         return new OfflineUser(uname);
     }
-    getOrCreateUser(email: string, type: string): User {
-        let ret = this.users[email];
-        if (ret){
-            return ret;
-        } else {
-            switch (type){
-                case 'yggdrasil': return new MojangUser({type, email});
-                case 'microsoft': return new XBoxUser({type, email});
-                default: return null;
-            }
+    static createUser(email: string, type: string): User {
+        switch (type){
+            case 'yggdrasil': return new MojangUser({type, email});
+            case 'microsoft': return new XBoxUser({type, email});
+            default: return null;
         }
     }
-    getUser(email: string): User {
-        return this.users[email];
+    forEach(consumer: (id: string, u: User) => any) {
+        for (const id in this.users) {
+            consumer(id, this.users[id]);
+        }
     }
-    async addUser(id: string, u: User){
+    getUser(id: string): User {
+        const u = this.users[id];
+        if (u === void 0) {
+            return null;
+        } else return u;
+    }
+    addUser(id: string, u: User){
         this.users[id] = u;
         return this.save();
     }
-    async logoutUser(u: MojangUser, getPass: () => Promise<string>){
-        var cela = this;
-        var log = this.ctx.log;
-        if(await u.validAndRefresh(this.ctx)){
-            log.i('user is valid, logging out');
-            await u.logout();
-        } else {
-            log.i('user is not valid, logging out using password');
-            let res = await httpsPost(new URL(authServerInfo.host + authServerInfo.logout), {
-                username: u.email,
-                password: await getPass()
-            });
-            if (res !== ''){
-                throw JSON.parse(res).errorMessage;
-            }
-        }
-        log.i('successfully logged out');
-        delete cela.users[u.email];
-        return cela.save();
+    removeUser(id: string): User {
+        const u = this.users[id];
+        delete this.users[id];
+        return u;
     }
 }
 
 export abstract class User {
     abstract getType(): string;
     abstract getName(): string;
+    abstract getAccountName(): string;
     abstract getUUID(): string;
     abstract getToken(): string;
     abstract serialize(): UserStorageData;
 
-    abstract needsLogin(): boolean;
-    abstract validate(): Promise<boolean>;
-    abstract refresh(): Promise<void>;
-    abstract login(pass: string, version: string): Promise<void>;
+    abstract makeValid(getPass: () => Promise<string>, saveUser: () => Promise<void>, logger: Log): Promise<void>;
     abstract logout(): Promise<void>;
-
-    async validAndRefresh(ctx: Context){
-        var log = ctx.log;
-        if(this.needsLogin()){
-            log.i('user has not logged in');
-            return false;
-        }
-        log.i('checking user validity');
-        if(!await this.validate()){
-            log.i('user not valid, refreshing');
-            await this.refresh();
-        }
-        return true;
-    }
-
-    async makeValid(ctx: Context, version: string, getPass: () => Promise<string>): Promise<boolean>{
-        var log = ctx.log;
-        if(await this.validAndRefresh(ctx)){
-            log.i('user is valid');
-        } else {
-            log.i('user is invalid, login required');
-            let pass = await getPass();
-            log.i('logging in');
-            await this.login(pass, version);
-            log.i('logging in successfull');
-        }
-        return true;
-    }
 
     initArg(arg: MCArg){
         arg
@@ -157,25 +108,20 @@ export abstract class User {
             case null:
             case void 0:
             case "yggdrasil": return new MojangUser(data);
-            case "microsoft": throw 'TODO';
+            case "microsoft": return new XBoxUser(data);
             default: return null;
         }
     }
 }
 
 class OfflineUser extends User{
+    async makeValid(getPass: () => Promise<string>): Promise<void> {
+    }
+    getAccountName(): string {
+        return this.name;
+    }
     serialize(): UserStorageData {
         throw new Error('Unreachable.');
-    }
-    needsLogin(): boolean {
-        return false;
-    }
-    async validate(): Promise<boolean> {
-        return true;
-    }
-    async refresh(): Promise<void> {
-    }
-    async login(pass: string, version: string): Promise<void> {
     }
     async logout(): Promise<void> {
     }
@@ -186,7 +132,7 @@ class OfflineUser extends User{
     getUUID(){ return '{}'; }
     getToken(){ return '{}'; }
 }
-interface UserProfile {
+export interface UserProfile {
     id: string;
     name: string;
 }
@@ -206,6 +152,8 @@ interface MojangUserStorageData {
 interface XBoxUserStorageData {
     type: "microsoft";
     email: string;
+    profile?: UserProfile;
+    credential?: MSACredential;
 }
 
 class MojangUser extends User {
@@ -230,6 +178,9 @@ class MojangUser extends User {
             properties: {}
         };
     }
+    getAccountName(): string {
+        return this.email;
+    }
     serialize(): UserStorageData {
         return {
             type: 'yggdrasil',
@@ -245,7 +196,17 @@ class MojangUser extends User {
     getName(){ return this.selectedProfile.name; }
     getUUID(){ return this.selectedProfile.id; }
     getToken(){ return this.accessToken; }
-    needsLogin(){ return this.accessToken === ''; }
+    async makeValid(getPass: () => Promise<string>, saveUser: () => Promise<void>, logger: Log): Promise<void> {
+        logger.i('checking user validity');
+        if (!await this.validate()) {
+            logger.i('user not valid, refreshing');
+            await this.refresh().catch(async (err) => {
+                return this.login(await getPass());
+            });
+        } else {
+            logger.i('user is valid');
+        }
+    }
     async login(pass: string, version: string = '1.0'){
         var cela = this;
         var resRaw = await httpsPost(new URL(authServerInfo.host + authServerInfo.login), {
@@ -297,87 +258,64 @@ class MojangUser extends User {
         }
     }
     async logout(){
-        var res = await httpsPost(new URL(authServerInfo.host + authServerInfo.invalidate), {
+        const res = await httpsPost(new URL(authServerInfo.host + authServerInfo.invalidate), {
             accessToken: this.accessToken,
             clientToken: this.clientToken
         });
         if(res !== ''){
             throw new Error("Failed to logout: " + JSON.parse(res).errorMessage);
         }
+        this.accessToken = null;
+        this.clientToken = null;
+        this.selectedProfile = null;
+        this.user = null;
+        this.profiles = null;
     }
-}
-
-const HEADERS = { 'User-Agent': 'jmcl' };
-
-function parseJson(ret: string){
-    return JSON.parse(ret);
 }
 
 class XBoxUser extends User {
     email: string;
-    userName: string;
-    uuid: string;
-    XSTSToken: string;
-    accessToken: string;
-    selectedProfile: UserProfile;
-    availableProfile: UserProfile[];
+    credential: MSACredential;
+    profile: UserProfile;
 
+    getAccountName(): string {
+        return this.email;
+    }
     serialize(): UserStorageData {
-        throw new Error('Method not implemented.');
+        return {
+            type: 'microsoft',
+            email: this.email,
+            profile: this.profile,
+            credential: this.credential,
+        };
     }
-    needsLogin(): boolean {
-        throw new Error('Method not implemented.');
-    }
-    validate(): Promise<boolean> {
-        throw new Error('Method not implemented.');
-    }
-    refresh(): Promise<void> {
-        throw new Error('Method not implemented.');
-    }
-    async login(pass: string, version: string): Promise<void> {
-        const xauthResponse = await XboxLiveAuth.authenticate(this.email, pass, {XSTSRelyingParty});
-        this.XSTSToken = xauthResponse.XSTSToken;
-        const mineServiceResponse = await httpsPost(
-            new URL(xboxAuthServerInfo.host + xboxAuthServerInfo.logWithXBox),
-            { identityToken: `XBL3.0 x=${xauthResponse.userHash};${xauthResponse.XSTSToken}` },
-            HEADERS
-        ).then(parseJson);
-
-        if (!mineServiceResponse.access_token){
-            throw new Error("Invalid credential");
+    async makeValid(getPass: () => Promise<string>, saveUser: () => Promise<void>, log: Log): Promise<void> {
+        if (!this.credential) {
+            this.credential = createMSACredential();
         }
-
-        this.accessToken = mineServiceResponse.access_token;
-
-        const mineEntitlements = await httpsGet(
-            new URL(xboxAuthServerInfo.host + xboxAuthServerInfo.entitlements),
-            {Authorization: `Bearer ${this.accessToken}`, ...HEADERS}
-        ).then(parseJson);
-        if (mineEntitlements.items.length === 0) throw Error('This user does not have any items on its accounts according to minecraft services.');
-
-        const profile = await httpsGet(
-            new URL(xboxAuthServerInfo.host + xboxAuthServerInfo.profile),
-            {Authorization: `Bearer ${this.accessToken}`, ...HEADERS}
-        ).then(parseJson);
-        if (!profile.id) throw Error('This user does not own minecraft according to minecraft services.')
-        this.uuid = profile.id;
-        this.userName = profile.name;
+        await validateMSACredential(this.credential, saveUser, log);
+        this.profile = await fetchProfile(this.credential.accessToken.data);
     }
-    logout(): Promise<void> {
-        throw new Error('Method not implemented.');
+    async logout(): Promise<void> {
+        // TODO: how to invalidate all tokens?
+        this.credential = null;
+        this.profile = null;
     }
     getType() { return "microsoft"; }
     getName(): string {
-        throw new Error('Method not implemented.');
+        return this.profile.name;
     }
     getUUID(): string {
-        throw new Error('Method not implemented.');
+        return this.profile.id;
     }
     getToken(): string {
-        throw new Error('Method not implemented.');
+        return this.credential.accessToken.data;
     }
 
     constructor(data: XBoxUserStorageData){
         super();
+        this.credential = data.credential ?? null;
+        this.email = data.email;
+        this.profile = data.profile ?? null;
     }
 }
