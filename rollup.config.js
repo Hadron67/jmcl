@@ -19,7 +19,8 @@ export default {
         'fs-extra',
         'crypto',
         'chalk',
-        'net'
+        'net',
+        '@xboxreplay/xboxlive-auth'
     ],
 
     output: [

@@ -17,6 +17,7 @@
   "author": "hadroncfy",
   "license": "MIT",
   "devDependencies": {
+    "@rollup/plugin-json": "^4.1.0",
     "@types/es6-shim": "^0.31.42",
     "@types/fs-extra": "^9.0.13",
     "@types/node": "^15.14.9",
@@ -40,7 +41,6 @@
   },
   "homepage": "https://github.com/Hadron67/jmcl#readme",
   "dependencies": {
-    "@rollup/plugin-json": "^4.1.0",
     "@xboxreplay/xboxlive-auth": "^3.3.3",
     "chalk": "^4.1.2",
     "fs-extra": "^10.0.0",

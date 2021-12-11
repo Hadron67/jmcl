@@ -74,12 +74,9 @@ export class NewMCArg implements MCArg {
     private _allowed(arg: CompoundArgumentItem): boolean{
         if (arg.compatibilityRules){
             return checkRule(this.cfg, arg.compatibilityRules);
-        }
-        else if (arg.rules) {
+        } else if (arg.rules) {
             return checkRule(this.cfg, arg.rules);
-        }
-        else
-            return true;
+        } else return true;
     }
 
     private _genArg(argItem: ArgumentItem[]): string[]{

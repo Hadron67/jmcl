@@ -92,8 +92,7 @@ export async function downloadAll(tasks: DownloadTask[], limit: number, lis: Dow
     function worker(resolve: () => void, reject: (e: any) => any){
         if (sendPtr >= tasks.length){
             resolve();
-        }
-        else {
+        } else {
             let {savePath, url} = tasks[sendPtr];
             let id = sendPtr;
             sendPtr++;
@@ -102,8 +101,7 @@ export async function downloadAll(tasks: DownloadTask[], limit: number, lis: Dow
                 if (err){
                     errors.push(err);
                     lis.onError(id, doneCount);
-                }
-                else {
+                } else {
                     lis.onDone(id, doneCount);
                 }
                 worker(resolve, reject);

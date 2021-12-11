@@ -106,7 +106,6 @@ async function main(argv){
 
     if (cmd === 'launch'){
         let uname, version, offline = false, pipeServerPort = null, javaPath = '';
-        let log4j2Fix = false;
         const jvmArgs = [];
         while (argv.length){
             switch (argv[0]){
@@ -142,10 +141,6 @@ async function main(argv){
                     }
                     argv.shift();
                     break;
-                case '--log4j2-fix':
-                    argv.shift();
-                    log4j2Fix = true;
-                    break;
                 default:
                     if (isJvmArg(argv[0])){
                         jvmArgs.push(argv[0]);
@@ -160,13 +155,12 @@ async function main(argv){
         uname || errMsgs.push('User name missing');
         version || errMsgs.push('Version missing');
         if (!errMsgs.length){
-            let prc = await jmcl.launch(ctx, {uname, version, offline, pipeServerPort, jvmArgs, javaPath, log4j2Fix});
+            let prc = await jmcl.launch(ctx, {uname, version, offline, pipeServerPort, jvmArgs, javaPath});
             return new Promise((resolve, reject) => {
                 prc.on('exit', (code) => resolve(code));
             });
         }
-    }
-    else if (cmd === 'logout'){
+    } else if (cmd === 'logout'){
         if (argv.length){
             await jmcl.logout(ctx, argv[0]);
             return 0;
@@ -174,8 +168,7 @@ async function main(argv){
         else {
             errMsgs.push('User name missing');
         }
-    }
-    else if (cmd === 'install'){
+    } else if (cmd === 'install'){
         let redownload = false, version = null;
         while (argv.length){
             switch (argv[0]){
@@ -194,8 +187,7 @@ async function main(argv){
         else {
             errMsgs.push('Version missing');
         }
-    }
-    else if (cmd === 'remove'){
+    } else if (cmd === 'remove'){
         if (argv.length){
             const vm = new jmcl.VersionManager(ctx);
             await vm.deleteVersion(argv[0]);
@@ -204,8 +196,7 @@ async function main(argv){
         else {
             errMsgs.push('Version missing');
         }
-    }
-    else if (cmd === 'install-all'){
+    } else if (cmd === 'install-all'){
         let redownload = false;
         if (argv.length && argv[0] === '--redownload'){
             redownload = true;
@@ -215,8 +206,7 @@ async function main(argv){
         await vm.loadAllVersions(true);
         await vm.validateAllVersions(redownload);
         return 0;
-    }
-    else if (cmd === 'list'){
+    } else if (cmd === 'list'){
         await ctx.prepareDirs();
         const vm = new jmcl.VersionManager(ctx);
         console.log("Installed versions:");
@@ -224,8 +214,7 @@ async function main(argv){
             console.log('-   ' + chalk.bold(v));
         }
         return 0;
-    }
-    else if (cmd === 'list-all'){
+    } else if (cmd === 'list-all'){
         let releaseOnly = false;
         while (argv.length){
             switch (argv[0]){
@@ -258,15 +247,13 @@ async function main(argv){
             }
             return 0;
         }
-    }
-    else if (cmd === 'cleanup'){
+    } else if (cmd === 'cleanup'){
         await ctx.prepareDirs();
         const vm = new jmcl.VersionManager(ctx);
         await vm.loadAllVersions(false);
         await vm.cleanup();
         return 0;
-    }
-    else {
+    } else {
         errMsgs.push(cmd === null ? 'Command missing' : `Unknown command ${cmd}`);
     }
 
@@ -280,8 +267,7 @@ async function main(argv){
 module.exports = async (argv) => {
     try {
         process.exitCode = await main(argv);
-    }
-    catch(e){
+    } catch(e){
         console.error(e);
         process.exitCode = -1;
     }

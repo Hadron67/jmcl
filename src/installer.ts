@@ -8,8 +8,7 @@ export async function install(ctx: Context, vname: string, redownloadLib: boolea
     const v = vmgr.getVersion(vname);
     if (await v.isVanillaVersion()){
         v.markRefresh();
-    }
-    else {
+    } else {
         ctx.log.w(`${vname} is not Vanilla, I might run into trooble`);
     }
     await v.loadData();

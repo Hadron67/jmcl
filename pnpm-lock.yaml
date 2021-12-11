@@ -18,13 +18,13 @@ specifiers:
   yauzl: ^2.10.0
 
 dependencies:
-  '@rollup/plugin-json': 4.1.0_rollup@2.61.0
   '@xboxreplay/xboxlive-auth': 3.3.3
   chalk: 4.1.2
   fs-extra: 10.0.0
   yauzl: 2.10.0
 
 devDependencies:
+  '@rollup/plugin-json': 4.1.0_rollup@2.61.0
   '@types/es6-shim': 0.31.42
   '@types/fs-extra': 9.0.13
   '@types/node': 15.14.9
@@ -45,7 +45,7 @@ packages:
     dependencies:
       '@rollup/pluginutils': 3.1.0_rollup@2.61.0
       rollup: 2.61.0
-    dev: false
+    dev: true
 
   /@rollup/pluginutils/3.1.0_rollup@2.61.0:
     resolution: {integrity: sha512-GksZ6pr6TpIjHm8h9lSQ8pi8BE9VeubNT0OMJ3B5uZJ8pz73NPiqOtCog/x2/QzM1ENChPKxMDhiQuRHsqc+lg==}
@@ -57,6 +57,7 @@ packages:
       estree-walker: 1.0.1
       picomatch: 2.3.0
       rollup: 2.61.0
+    dev: true
 
   /@rollup/pluginutils/4.1.1:
     resolution: {integrity: sha512-clDjivHqWGXi7u+0d2r2sBi4Ie6VLEAzWMIkvJLnDmxoOhBYOTfzGbOQBA32THHm11/LiJbd01tJUpJsbshSWQ==}
@@ -72,6 +73,7 @@ packages:
 
   /@types/estree/0.0.39:
     resolution: {integrity: sha512-EYNwp3bU+98cpU4lAWYYL7Zz+2gryWH1qbdDTidVd6hkiR6weksdbMadyXKXNPEkQFhXM+hVO9ZygomHXp+AIw==}
+    dev: true
 
   /@types/fs-extra/9.0.13:
     resolution: {integrity: sha512-nEnwB++1u5lVDM2UI4c1+5R+FYaKfaAzS4OococimjVm3nQw3TuzH5UNsocrcTBbhnerblyHj4A49qXbIiZdpA==}
@@ -161,6 +163,7 @@ packages:
 
   /estree-walker/1.0.1:
     resolution: {integrity: sha512-1fMXF3YP4pZZVozF8j/ZLfvnR8NSIljt56UhbZ5PeeDmmGHpgpdwQt7ITlGvYaQukCvuBRMLEiKiYC+oeIg4cg==}
+    dev: true
 
   /estree-walker/2.0.2:
     resolution: {integrity: sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w==}
@@ -312,6 +315,7 @@ packages:
   /picomatch/2.3.0:
     resolution: {integrity: sha512-lY1Q/PiJGC2zOv/z391WOTD+Z02bCgsFfvxoXXf6h7kv9o+WmsmzYqrAwY63sNgOxE4xEdq0WyUnXfKeBrSvYw==}
     engines: {node: '>=8.6'}
+    dev: true
 
   /pkg-dir/4.2.0:
     resolution: {integrity: sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==}

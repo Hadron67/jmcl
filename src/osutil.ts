@@ -3,7 +3,6 @@ import * as os from 'os';
 var darwin2mac = {
     '0.1': '0.1',
     '0.2': '1.0.1',
-    
 };
 
 export function getOS(): { osName: string, osV: string, osArch: string }{
@@ -11,7 +10,7 @@ export function getOS(): { osName: string, osV: string, osArch: string }{
     var v = os.release();
     var a = os.arch();
     switch(sn){
-        case 'Darwin': 
+        case 'Darwin':
             sn = 'osx';
             break;
         case 'Windows_NT':

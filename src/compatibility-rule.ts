@@ -37,15 +37,13 @@ export function checkRule(env: MCConfig, rules: CompatibilityRule[]){
                 matched = false;
             }
         }
-        
+
         if (matched){
             if (rule.action === 'allow'){
                 allowed = true;
-            }
-            else if (rule.action === 'disallow'){
+            } else if (rule.action === 'disallow'){
                 disallowed = true;
-            }
-            else {
+            } else {
                 throw new Error(`Unknown action ${rule.action}`);
             }
         }

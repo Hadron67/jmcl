@@ -107,7 +107,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
         log.i('removing temporary files');
         await remove(nativesDir);
     });
-    
+
     if (opt.pipeServerPort){
         const s = createPipeServer();
         prc.stdout.on('data', d => s.write(d.toString('utf-8')));

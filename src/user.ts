@@ -39,8 +39,7 @@ export class UserManager{
                 this.users[name] = User.fromUserStorage(u);
             }
             this.ctx.log.i('done loading users');
-        }
-        else {
+        } else {
             this.ctx.log.i('user file not exists, skipping');
         }
         return true;
@@ -88,8 +87,7 @@ export class UserManager{
         if(await u.validAndRefresh(this.ctx)){
             log.i('user is valid, logging out');
             await u.logout();
-        }
-        else {
+        } else {
             log.i('user is not valid, logging out using password');
             let res = await httpsPost(new URL(authServerInfo.host + authServerInfo.logout), {
                 username: u.email,
@@ -136,8 +134,7 @@ export abstract class User {
         var log = ctx.log;
         if(await this.validAndRefresh(ctx)){
             log.i('user is valid');
-        }
-        else {
+        } else {
             log.i('user is invalid, login required');
             let pass = await getPass();
             log.i('logging in');
@@ -218,16 +215,16 @@ class MojangUser extends User {
     profiles: UserProfile[];
     selectedProfile: UserProfile;
     user: {id: string, properties: {[s: string]: string}};
-    
+
     constructor(u: MojangUserStorageData){
         super();
         this.email = u.email;
         this.accessToken = u.accessToken || '';
         this.clientToken = u.clientToken || randHex(32);
-        
+
         this.profiles = u.profiles || [];
         this.selectedProfile = u.selectedProfile || null;
-        
+
         this.user = u.user || {
             id: '',
             properties: {}
@@ -261,8 +258,7 @@ class MojangUser extends User {
         var res = JSON.parse(resRaw);
         if(res.error){
             throw 'logging failed: ' + res.errorMessage;
-        }
-        else {
+        } else {
             if(res.clientToken !== cela.clientToken){
                 throw 'client token changed, which shouldnt happen';
             }
@@ -279,7 +275,7 @@ class MojangUser extends User {
             accessToken: this.accessToken
         });
     }
-    
+
     async refresh(){
         var cela = this;
         var resRaw = await httpsPost(new URL(authServerInfo.host + authServerInfo.refresh), {
@@ -292,8 +288,7 @@ class MojangUser extends User {
         var res = JSON.parse(resRaw);
         if(res.error){
             throw new Error(`Failed to refresh: ${res.errorMessage}`);
-        }
-        else {
+        } else {
             cela.accessToken = res.accessToken;
             // cela.profiles = res.availableProfiles;
             cela.selectedProfile = res.selectedProfile;
@@ -359,7 +354,7 @@ class XBoxUser extends User {
             {Authorization: `Bearer ${this.accessToken}`, ...HEADERS}
         ).then(parseJson);
         if (mineEntitlements.items.length === 0) throw Error('This user does not have any items on its accounts according to minecraft services.');
-        
+
         const profile = await httpsGet(
             new URL(xboxAuthServerInfo.host + xboxAuthServerInfo.profile),
             {Authorization: `Bearer ${this.accessToken}`, ...HEADERS}

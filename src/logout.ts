@@ -10,8 +10,7 @@ export async function logout(ctx: Context, uname: string): Promise<void>{
         await umgr.loadFromFile();
         var user = umgr.getUser(uname);
         await user.logout();
-    }
-    catch(msg){
+    } catch(msg){
         log.e(msg);
     }
 }

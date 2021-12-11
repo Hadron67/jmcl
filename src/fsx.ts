@@ -65,8 +65,7 @@ export function ls(dir: string): Promise<FileInfo[]> {
         fs.readdir(dir, (err, files) => {
             if (err){
                 reject(err);
-            }
-            else if (files.length > 0){
+            } else if (files.length > 0){
                 let count = 0;
                 for (let file of files){
                     fs.stat(join(dir, file), (err, stat) => {
@@ -79,8 +78,7 @@ export function ls(dir: string): Promise<FileInfo[]> {
                         }
                     });
                 }
-            }
-            else {
+            } else {
                 resolve([]);
             }
         });
@@ -95,8 +93,7 @@ export async function find(outterDir: string){
             file = join(dir, file);
             if (isDir){
                 pr.push(findOne(file));
-            }
-            else {
+            } else {
                 ret.push(file);
             }
         }

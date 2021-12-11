@@ -118,8 +118,7 @@ class VersionManager {
         if (await exists(vd)){
             await remove(vd);
             ctx.log.i(`Removed directory ${vd}`);
-        }
-        else {
+        } else {
             ctx.log.e(`Directory ${vd} not found`);
         }
     }
@@ -223,8 +222,7 @@ class VersionManager {
             await removeEmptyDirs(libdir);
             await removeEmptyDirs(assetDir);
             ctx.log.i('Done');
-        }
-        else {
+        } else {
             ctx.log.i('No files to delete');
         }
     }
@@ -240,7 +238,7 @@ interface LibraryData {
     name: string;
     natives?: {[os: string]: string};
     downloads: {
-        artifact: DownloadInfo, 
+        artifact: DownloadInfo,
         classifiers: {[name: string]: DownloadInfo}
     };
     url?: string;
@@ -308,8 +306,7 @@ async function extractOneLib(ctx: Context, dir: string, libdir: string, libPath:
         openZip(pathd.join(libdir, libPath), {lazyEntries: true}, (err, zfile) => {
             if (err) {
                 reject(err);
-            }
-            else {
+            } else {
                 zfile.on('entry', entry => {
                     if (excluded(excludes, entry.fileName)){
                         zfile.readEntry();
@@ -320,23 +317,20 @@ async function extractOneLib(ctx: Context, dir: string, libdir: string, libPath:
                         zfile.openReadStream(entry, (err, s) => {
                             if (err){
                                 reject(err);
-                            }
-                            else {
+                            } else {
                                 s.on('end', () => zfile.readEntry());
                                 const dest = fs.createWriteStream(pathd.join(dir, entry.fileName));
                                 s.pipe(dest);
                             }
                         });
-                    }
-                    else {
+                    } else {
                         const dn = pathd.join(dir, entry.fileName);
-                        fs.exists(dn, e => {
-                            if (!e){
+                        fs.stat(dn, err => {
+                            if (err) {
                                 fs.mkdir(dn, err => {
                                     err ? reject(err) : zfile.readEntry();
                                 });
-                            }
-                            else {
+                            } else {
                                 zfile.readEntry();
                             }
                         });
@@ -366,8 +360,7 @@ function getLibraryPath(lib: LibraryData){
             const p = lib.downloads.artifact.path;
             return p ? pathd.normalize(p) : pathd.join(...libraryName2Path(lib.name, null));
         }
-    }
-    else {
+    } else {
         return pathd.join(...libraryName2Path(lib.name, null));
     }
     return null;
@@ -379,12 +372,10 @@ function getNativeLibraryPath(lib: LibraryData, os: string){
             if (lib.downloads.classifiers && lib.downloads.classifiers[nativeString]){
                 return pathd.normalize(lib.downloads.classifiers[nativeString].path) || pathd.join(...libraryName2Path(lib.name, nativeString));
             }
-        }
-        else {
+        } else {
             return pathd.join(...libraryName2Path(lib.name, nativeString));
         }
-    }
-    else {
+    } else {
         return null;
     }
 }
@@ -401,8 +392,7 @@ async function needDownloadLibraryURL(lib: LibraryData, libpath: string, redownl
             }
             return lib.downloads.artifact.url;
         }
-    }
-    else {
+    } else {
         // Fabric, Optifine, old launcher version
         if (await exists(libpath) && !redownload){
             return null;
@@ -421,8 +411,7 @@ async function needDownloadNativeLibraryURL(lib: LibraryData, os: string, libpat
                 return null;
             }
             return nld.url;
-        }
-        else {
+        } else {
             // Old
             if (await exists(libpath) && !redownload){
                 return null;
@@ -469,8 +458,7 @@ class Version {
     async isVanillaVersion(){
         if (this.versionJson === null){
             return await this.mgr.getVersionInfo(this.vname) !== null;
-        }
-        else {
+        } else {
             return true;
         }
     }
@@ -492,11 +480,9 @@ class Version {
                 await writeFile(jsonPath, rawJson);
                 this.versionJson = JSON.parse(rawJson);
                 ctx.log.i(`saved version file of ${this.vname}`);
-            }
-            else if(!await exists(jsonPath)) {
+            } else if(!await exists(jsonPath)) {
                 throw new Error(`Version ${this.vname} json file not found, try downloading this version first.`);
-            }
-            else {
+            } else {
                 ctx.log.i(`reading version file of ${this.vname}`);
                 this.versionJson = JSON.parse(await readFile(jsonPath));
             }
@@ -537,8 +523,7 @@ class Version {
             const dinfo = this.versionJson.downloads.client;
             if (await exists(jarPath) && dinfo.sha1 === await fileSHA1(jarPath)){
                 return;
-            }
-            else {
+            } else {
                 ctx.log.i(`Downloading jar for ${this.vname}`);
                 await ensureDir(vdir);
                 await downloadToFile(new URL(dinfo.url), jarPath, {
@@ -560,11 +545,11 @@ class Version {
             let tasks: DownloadTask[] = [];
             let libPathSet: {[n: string]: boolean} = {};
             ctx.log.i(`Checking libraries of ${this.vname}`);
-    
+
             const os = getOS().osName;
             const libdir = pathd.join(ctx.getMCRoot(), 'libraries');
             await ensureDir(libdir);
-    
+
             for (const lib of this.versionJson.libraries){
                 const libpath = getLibraryPath(lib);
                 const nativeLibPath = getNativeLibraryPath(lib, os);
@@ -595,7 +580,7 @@ class Version {
                     }
                 }
             }
-    
+
             if (tasks.length){
                 ctx.log.i('Downloading libraries');
                 await downloadAll(tasks, ctx.config.downloadConcurrentLimit, {
@@ -620,8 +605,7 @@ class Version {
                 let rawJson: string;
                 if (await exists(jsonPath) && sha1sum(rawJson = await readFile(jsonPath)) === aindex.sha1){
                     this.assetsJson = JSON.parse(rawJson);
-                }
-                else {
+                } else {
                     ctx.log.i(`Downloading asset index of version ${aindex.id}`);
                     rawJson = await httpsGet(new URL(aindex.url));
                     await writeFile(jsonPath, rawJson);
@@ -644,7 +628,7 @@ class Version {
             const ctx = this.mgr.ctx;
             const objdir = pathd.join(ctx.getMCRoot(), 'assets', 'objects');
             ctx.log.i(`Checking assets of ${this.vname}`);
-            
+
             let checkTasks: Promise<void>[] = [];
             for (const name in this.assetsJson.objects){
                 const {size, hash} = this.assetsJson.objects[name];
@@ -657,9 +641,9 @@ class Version {
                     }
                 })());
             }
-    
+
             await Promise.all(checkTasks);
-    
+
             if (tasks.length){
                 ctx.log.i('Downloading assets');
                 await downloadAll(tasks, ctx.config.downloadConcurrentLimit, {
@@ -738,8 +722,7 @@ class Version {
         var arg: MCArg;
         if(this.versionJson.hasOwnProperty('minecraftArguments')){
             arg = new LegacyMCArg(this.versionJson.minecraftArguments);
-        }
-        else {
+        } else {
             const argJson: ArgumentJson = {game: [], jvm: []};
             let v: Version = this;
             while (v){
@@ -768,7 +751,7 @@ class Version {
         // Uncommenting the following line would make the console log output of Minecraft in xml.
         // let logging = this.versionJson.logging.client;
         // arg.appendRaw(logging.argument.replace(/\${path}/g, pathd.join(assetsDir, 'log_configs', logging.file.id)));
-        
+
         return arg
                 .arg('version_name', this.vname)
                 .arg('game_directory', env.getMCRoot())

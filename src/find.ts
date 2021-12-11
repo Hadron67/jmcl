@@ -8,8 +8,7 @@ export async function findAssets(dir: string){
     );
     if (r.length){
         return r.reduce((prev, cur) => prev.concat(cur)).filter(f => !f.isDir).map(f => f.file);
-    }
-    else {
+    } else {
         return [];
     }
     // return (await Promise.all((await ls(dir))
