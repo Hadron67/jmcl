@@ -1,6 +1,6 @@
 import { PublicClientApplication } from "@azure/msal-node";
 import { URL } from "url";
-import { httpsGet, httpsPost } from "./ajax";
+import { httpsGet, httpsPost, StatusError } from "./ajax";
 import { Log } from "./log";
 import { UserProfile } from "./user";
 
@@ -15,8 +15,12 @@ function parseJson(ret: string) {
     return JSON.parse(ret);
 }
 
+function dateToValue(d: Date): number {
+    return (d.valueOf() / 1000) | 0;
+}
+
 function getNow(): number {
-    return (new Date().valueOf() / 1000) | 0;
+    return dateToValue(new Date());
 }
 
 interface TimedObject {
@@ -33,7 +37,7 @@ interface XBLToken extends TimedObject {
 }
 
 export interface MSACredential {
-    MSAToken: TimedToken;
+    msaToken: TimedToken;
     xblToken: XBLToken;
     xstsToken: TimedToken;
     accessToken: TimedToken;
@@ -50,11 +54,11 @@ function getRefreshToken(self: MSACredential, clientId: string): string {
 }
 
 export function createMSACredential(): MSACredential {
-    return { MSAToken: null, accessToken: null, xblToken: null, xstsToken: null, cache: { msToken: {}, xblToken: null } };
+    return { msaToken: null, accessToken: null, xblToken: null, xstsToken: null, cache: { msToken: {}, xblToken: null } };
 }
 
 async function validateMSAToken(self: MSACredential, logger: Log) {
-    if (self.MSAToken === null) {
+    if (self.msaToken === null) {
         // const clientId = "000000004C12AE6F";
         const clientId = '389b1b32-b5d5-43b2-bddc-84ce938d6737';
         const scopes = ['XboxLive.signin', 'offline_access'];
@@ -85,13 +89,13 @@ async function validateMSAToken(self: MSACredential, logger: Log) {
         if (refreshToken !== null) {
             logger.i("trying to refresh MSA");
             const res = await pca.acquireTokenByRefreshToken({ scopes, refreshToken }).catch(e => {
-                logger.w(`Failed to refresh: ${e}`);
+                logger.w(`failed to refresh: ${e}`);
                 return null;
             });
             if (res !== null) {
-                logger.i('Got MSA token');
-                self.MSAToken = {
-                    expiresOn: res.expiresOn.valueOf(),
+                logger.i('MSA token refreshed');
+                self.msaToken = {
+                    expiresOn: dateToValue(res.expiresOn),
                     data: res.accessToken,
                 };
                 return;
@@ -100,12 +104,12 @@ async function validateMSAToken(self: MSACredential, logger: Log) {
         const res = await pca.acquireTokenByDeviceCode({
             scopes,
             deviceCodeCallback(response) {
-                logger.i('Authentication required');
+                logger.i('authentication required');
                 logger.i(response.message);
-            }
+            },
         });
-        self.MSAToken = {
-            expiresOn: (res.expiresOn.valueOf() / 1000) | 0,
+        self.msaToken = {
+            expiresOn: dateToValue(res.expiresOn),
             data: res.accessToken,
         };
     }
@@ -122,13 +126,13 @@ async function doXBLAuth(accessToken: string): Promise<XBLToken> {
         TokenType: "JWT"
     }, { Accept: 'application/json' }).then(parseJson);
     return {
-        expiresOn: (new Date(res.NotAfter).valueOf() / 1000) | 0,
+        expiresOn: dateToValue(new Date(res.NotAfter)),
         token: res.Token,
         userHash: res.DisplayClaims.xui[0].uhs,
     };
 }
 
-async function doXSTSAuth(xblToken: string, relyingParty: string, logger: Log): Promise<TimedToken> {
+async function doXSTSAuth(xblToken: string, relyingParty: string): Promise<TimedToken> {
     const res = await httpsPost(new URL(XSTS_AUTH_ENDPOINT), {
         Properties: {
             SandboxId: "RETAIL",
@@ -139,17 +143,21 @@ async function doXSTSAuth(xblToken: string, relyingParty: string, logger: Log): 
         RelyingParty: relyingParty,
         TokenType: "JWT"
     }).then(parseJson).catch(res => {
-        if (res.XErr) {
-            switch (res.XErr) {
-                case 2148916233: logger.e('No XBox profile associated with the user, signup at https://signup.live.com/signup'); break;
-                case 2148916235: logger.e('XBox Live is not available in your region'); break;
-                default: logger.e(`Failed to login with XBox: ${res.Message}`);
+        if (res instanceof StatusError) {
+            let msg: string = res.data;
+            const data = JSON.parse(res.data);
+            if (data.XErr) {
+                switch (data.XErr) {
+                    case 2148916233: msg = 'No XBox profile associated with the user, signup at https://signup.live.com/signup';
+                    case 2148916235: msg = 'XBox Live is not available in your region'; break;
+                    default: msg = `Failed to login with XBox: ${data.Message}`;
+                }
             }
+            throw new Error(msg);
         }
-        throw new Error(res);
     });
     return {
-        expiresOn: (new Date(res.NotAfter).valueOf() / 1000) | 0,
+        expiresOn: dateToValue(new Date(res.NotAfter)),
         data: res.Token,
     };
 }
@@ -180,12 +188,12 @@ export interface AuthContext {
 }
 
 async function getMSAToken(self: MSACredential, ctx: AuthContext): Promise<TimedToken> {
-    if (self.MSAToken && self.MSAToken.expiresOn - getNow() > 1) {
-        return self.MSAToken;
+    if (self.msaToken && self.msaToken.expiresOn - getNow() > 1) {
+        return self.msaToken;
     } else {
         await validateMSAToken(self, ctx.logger);
         await ctx.saveUser();
-        return self.MSAToken;
+        return self.msaToken;
     }
 }
 
@@ -194,7 +202,7 @@ async function getXBLToken(self: MSACredential, ctx: AuthContext): Promise<XBLTo
         return self.xblToken;
     } else {
         const msaToken = await getMSAToken(self, ctx);
-        ctx.logger.i('Logging in to XBox Live');
+        ctx.logger.i('logging in to XBox Live');
         self.xblToken = await doXBLAuth(msaToken.data);
         await ctx.saveUser();
         return self.xblToken;
@@ -206,8 +214,8 @@ async function getXSTSToken(self: MSACredential, ctx: AuthContext): Promise<Time
         return self.xstsToken;
     } else {
         const xblToken = await getXBLToken(self, ctx);
-        ctx.logger.i('Logging in to XSTS');
-        self.xstsToken = await doXSTSAuth(xblToken.token, XSTS_RELYING_PARTY, ctx.logger);
+        ctx.logger.i('logging in to XSTS');
+        self.xstsToken = await doXSTSAuth(xblToken.token, XSTS_RELYING_PARTY);
         await ctx.saveUser();
         return self.xstsToken;
     }
@@ -219,7 +227,7 @@ export async function getAccessToken(self: MSACredential, ctx: AuthContext): Pro
     } else {
         const xstsToken = await getXSTSToken(self, ctx);
         const xblToken = await getXBLToken(self, ctx);
-        ctx.logger.i('Obtaining access token');
+        ctx.logger.i('obtaining access token');
         self.accessToken = await fetchAccessToken(xstsToken.data, xblToken.userHash);
         await ctx.saveUser();
         return self.accessToken;

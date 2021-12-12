@@ -1,7 +1,7 @@
 const jmcl = require('../');
 
 module.exports = async () => {
-    let errors = [];
+    const errors = [];
     try {
         await jmcl.main(process.argv.slice(2), errors);
         process.exitCode = 0;

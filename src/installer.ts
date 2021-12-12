@@ -12,6 +12,6 @@ export async function install(ctx: Context, vname: string, redownloadLib: boolea
         ctx.log.w(`${vname} is not Vanilla, I might run into trooble`);
     }
     await v.loadData();
-    await v.validateAll(redownloadLib);
+    await v.validateAll(redownloadLib, true);
     log.i('Done');
 }

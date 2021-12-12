@@ -11,11 +11,15 @@ export interface AjaxOptions {
     body?: string;
 }
 
+export class StatusError {
+    constructor(public code: number, public data: string) {}
+}
+
 function checkStatus({status, data}: {status: number, data: string}): string {
     if (status === 200) {
         return data;
     } else {
-        throw new Error(data);
+        throw new StatusError(status, data);
     }
 }
 

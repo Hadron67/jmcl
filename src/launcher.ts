@@ -54,7 +54,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
         await umgr.save();
         user = user2;
     }
-    log.i(`User name is ${user.getName()}`);
+    log.i(`user name is ${user.getName()}`);
 
     const mcargs = v.getArgs(ctx.config);
     const jars = v.getClasspathJars(ctx.config);
@@ -67,7 +67,7 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
         nativesDir = join(tmpd, randHex(32));
     }
     await ensureDir(nativesDir);
-    log.i('extracting native libraries');
+    log.v('extracting native libraries');
     await v.extractNatives(nativesDir, ctx.config);
 
     mcargs.arg('classpath', jars.join(':'))
@@ -89,7 +89,6 @@ export async function launch(ctx: Context, opt: LaunchOption): Promise<cpc.Child
         opt.jvmArgs.push('-Dlog4j2.formatMsgNoLookups=true');
     }
 
-    log.i('generating arguments');
     const cmd: string[] = [
         '-XX:-UseAdaptiveSizePolicy',
         '-XX:-OmitStackTraceInFastThrow',

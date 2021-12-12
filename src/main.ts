@@ -273,7 +273,7 @@ export async function main(argv: string[], errMsgs: string[]): Promise<void> {
                     throw '';
                 }
                 um.addUser(userName, user);
-                ctx.log.i(`Added ${userType} user "${userName}" with account name ${userEmail}`);
+                ctx.log.i(`added ${userType} user "${userName}" with account name ${userEmail}`);
                 break;
             }
             case 'validate': {
@@ -285,7 +285,7 @@ export async function main(argv: string[], errMsgs: string[]): Promise<void> {
                 }
                 await user.makeValid(() => ctx.readInput(`password for ${user.getAccountName()}:`, true), async () => { await um.save(); }, ctx.log);
                 await um.save();
-                ctx.log.i(`Validated, user name: ${user.getName()}`);
+                ctx.log.i(`validated, user name: ${user.getName()}`);
                 break;
             }
             case 'logout': {

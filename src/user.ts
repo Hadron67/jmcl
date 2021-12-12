@@ -294,6 +294,7 @@ class XBoxUser extends User {
             this.credential = createMSACredential();
         }
         const accessToken = await getMSAAccessToken(this.credential, { logger, saveUser });
+        logger.i('fetching profile');
         this.profile = await fetchProfile(accessToken.data);
     }
     async logout(): Promise<void> {

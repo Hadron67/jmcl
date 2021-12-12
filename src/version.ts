@@ -95,7 +95,6 @@ class VersionManager {
         await Promise.all((await this.listInstalled()).map(async (f) => {
             let v = this.getVersion(f);
             if (await v.versionFileExists()){
-                ctx.log.i(`Loaded version ${v.vname}`);
                 this.versions[v.vname] = v;
                 // Only vanilla can be downloaded
                 // Third party clients are not present in the version manifest
@@ -103,13 +102,15 @@ class VersionManager {
                     v.markRefresh();
                 }
                 await v.loadData();
+                ctx.log.v(`loaded version ${v.vname}`);
             }
         }));
     }
     async validateAllVersions(redownloadLib: boolean){
         for (const vname in this.versions){
             const v = this.versions[vname];
-            await v.validateAll(redownloadLib);
+            this.ctx.log.i(`checking version ${vname}`);
+            await v.validateAll(redownloadLib, false);
         }
     }
     async deleteVersion(vname: string){
@@ -117,9 +118,9 @@ class VersionManager {
         const vd = ctx.getVersionDir(vname);
         if (await exists(vd)){
             await remove(vd);
-            ctx.log.i(`Removed directory ${vd}`);
+            ctx.log.i(`removed directory ${vd}`);
         } else {
-            ctx.log.e(`Directory ${vd} not found`);
+            ctx.log.e(`directory ${vd} not found`);
         }
     }
     async isInstalled(vname: string){
@@ -196,7 +197,7 @@ class VersionManager {
         for (const lib in libs){
             if (libs[lib]){
                 tasks.push((async () => {
-                    ctx.log.i(`Removing library ${pathd.basename(lib)}`);
+                    ctx.log.i(`removing library ${pathd.basename(lib)}`);
                     await rmFile(pathd.join(libdir, lib));
                 })());
             }
@@ -204,7 +205,7 @@ class VersionManager {
         for (const a in assets){
             if (assets[a]){
                 tasks.push((async () => {
-                    ctx.log.i(`Removing asset ${a}`);
+                    ctx.log.i(`removing asset ${a}`);
                     await rmFile(pathd.join(assetDir, ...getAssetPath(a)));
                 })());
             }
@@ -212,7 +213,7 @@ class VersionManager {
         for (const ai in assetIndexes){
             if (assetIndexes[ai]){
                 tasks.push((async () => {
-                    ctx.log.i(`Removing asset index file ${ai}`);
+                    ctx.log.i(`removing asset index file ${ai}`);
                     await rmFile(pathd.join(assetIndexDir, ai));
                 })());
             }
@@ -221,9 +222,9 @@ class VersionManager {
             await Promise.all(tasks);
             await removeEmptyDirs(libdir);
             await removeEmptyDirs(assetDir);
-            ctx.log.i('Done');
+            ctx.log.i('done');
         } else {
-            ctx.log.i('No files to delete');
+            ctx.log.i('no files to delete');
         }
     }
 }
@@ -313,7 +314,7 @@ async function extractOneLib(ctx: Context, dir: string, libdir: string, libPath:
                         return;
                     }
                     if (!entry.fileName.endsWith('/')){
-                        log.v(`Extracting ${entry.fileName} from ${pathd.basename(libPath)}.`);
+                        log.v(`extracting ${entry.fileName} from ${pathd.basename(libPath)}.`);
                         zfile.openReadStream(entry, (err, s) => {
                             if (err){
                                 reject(err);
@@ -472,18 +473,18 @@ class Version {
                 this._needRefresh = false;
                 const info = await this.mgr.getVersionInfo(this.vname);
                 if (info === null){
-                    throw new Error(`Version ${this.vname} not found in version manifest.`);
+                    throw new Error(`version ${this.vname} not found in version manifest.`);
                 }
-                ctx.log.i(`Downloading version json for ${this.vname}`);
+                ctx.log.i(`downloading version json for ${this.vname}`);
                 const rawJson = await httpsGet(new URL(info.url));
                 await ensureDir(vdir);
                 await writeFile(jsonPath, rawJson);
                 this.versionJson = JSON.parse(rawJson);
-                ctx.log.i(`saved version file of ${this.vname}`);
+                ctx.log.v(`saved version file of ${this.vname}`);
             } else if(!await exists(jsonPath)) {
-                throw new Error(`Version ${this.vname} json file not found, try downloading this version first.`);
+                throw new Error(`version ${this.vname} json file not found, try downloading this version first.`);
             } else {
-                ctx.log.i(`reading version file of ${this.vname}`);
+                ctx.log.v(`reading version file of ${this.vname}`);
                 this.versionJson = JSON.parse(await readFile(jsonPath));
             }
         }
@@ -499,13 +500,14 @@ class Version {
             this.needLog4j2Fix = this.needLog4j2Fix || this._parent.needLog4j2Fix;
         }
     }
-    async validateAll(redownloadLib: boolean){
+    async validateAll(redownloadLib: boolean, recursive: boolean){
         let vp: Version = this;
-        while (vp){
+        while (vp) {
             await vp.validateLibs(redownloadLib);
             await vp.validateAssetIndex();
             await vp.validateAssets();
             await vp.validateJar();
+            if (!recursive) break;
             vp = vp._parent;
         }
     }
@@ -515,7 +517,7 @@ class Version {
         if (this._jarValide){
             return;
         }
-        ctx.log.i(`Checking jar file of ${this.vname}`);
+        ctx.log.v(`checking jar file of ${this.vname}`);
 
         const vdir = ctx.getVersionDir(this.vname);
         const jarPath = pathd.join(vdir, this.vname + '.jar');
@@ -524,7 +526,7 @@ class Version {
             if (await exists(jarPath) && dinfo.sha1 === await fileSHA1(jarPath)){
                 return;
             } else {
-                ctx.log.i(`Downloading jar for ${this.vname}`);
+                ctx.log.i(`downloading jar for ${this.vname}`);
                 await ensureDir(vdir);
                 await downloadToFile(new URL(dinfo.url), jarPath, {
                     count: 50,
@@ -544,7 +546,7 @@ class Version {
             let ctx = this.mgr.ctx;
             let tasks: DownloadTask[] = [];
             let libPathSet: {[n: string]: boolean} = {};
-            ctx.log.i(`Checking libraries of ${this.vname}`);
+            ctx.log.v(`checking libraries of ${this.vname}`);
 
             const os = getOS().osName;
             const libdir = pathd.join(ctx.getMCRoot(), 'libraries');
@@ -582,10 +584,10 @@ class Version {
             }
 
             if (tasks.length){
-                ctx.log.i('Downloading libraries');
+                ctx.log.i(`downloading libraries of ${this.vname}`);
                 await downloadAll(tasks, ctx.config.downloadConcurrentLimit, {
-                    onDone(i, dc) { ctx.log.i(`(${dc}/${tasks.length}) Downloaded library ${pathd.basename(tasks[i].savePath)}`) },
-                    onError(i, dc){ ctx.log.e(`(${dc}/${tasks.length}) Failed to downloaded library ${pathd.basename(tasks[i].savePath)}`); }
+                    onDone(i, dc) { ctx.log.i(`(${dc}/${tasks.length}) downloaded library ${pathd.basename(tasks[i].savePath)}`) },
+                    onError(i, dc){ ctx.log.e(`(${dc}/${tasks.length}) failed to downloaded library ${pathd.basename(tasks[i].savePath)}`); }
                 });
             }
         }
@@ -599,14 +601,14 @@ class Version {
         if (this.versionJson.assetIndex){
             const ctx = this.mgr.ctx;
             const aindex = this.versionJson.assetIndex;
-            ctx.log.i(`Checking asset index of ${this.vname}`);
+            ctx.log.v(`checking asset index of ${this.vname}`);
             if (this.assetsJson === null){
                 const jsonPath = pathd.join(ctx.getMCRoot(), 'assets', 'indexes', this.versionJson.assets + '.json');
                 let rawJson: string;
                 if (await exists(jsonPath) && sha1sum(rawJson = await readFile(jsonPath)) === aindex.sha1){
                     this.assetsJson = JSON.parse(rawJson);
                 } else {
-                    ctx.log.i(`Downloading asset index of version ${aindex.id}`);
+                    ctx.log.i(`downloading asset index of version ${aindex.id}`);
                     rawJson = await httpsGet(new URL(aindex.url));
                     await writeFile(jsonPath, rawJson);
                     this.assetsJson = JSON.parse(rawJson);
@@ -627,7 +629,7 @@ class Version {
             let tasks: AssetDownloadTask[] = [];
             const ctx = this.mgr.ctx;
             const objdir = pathd.join(ctx.getMCRoot(), 'assets', 'objects');
-            ctx.log.i(`Checking assets of ${this.vname}`);
+            ctx.log.v(`checking assets of ${this.vname}`);
 
             let checkTasks: Promise<void>[] = [];
             for (const name in this.assetsJson.objects){
@@ -645,10 +647,10 @@ class Version {
             await Promise.all(checkTasks);
 
             if (tasks.length){
-                ctx.log.i('Downloading assets');
+                ctx.log.i(`downloading assets of ${this.vname}`);
                 await downloadAll(tasks, ctx.config.downloadConcurrentLimit, {
-                    onDone(i, dc) { ctx.log.i(`(${dc}/${tasks.length}) Downloaded asset ${tasks[i].name}`); },
-                    onError(i, dc){ ctx.log.e(`(${dc}/${tasks.length}) Failed to downloaded asset ${tasks[i].name}`); }
+                    onDone(i, dc) { ctx.log.i(`(${dc}/${tasks.length}) downloaded asset ${tasks[i].name}`); },
+                    onError(i, dc){ ctx.log.e(`(${dc}/${tasks.length}) failed to downloaded asset ${tasks[i].name}`); }
                 });
             }
         }
@@ -718,7 +720,7 @@ class Version {
         }
         return null;
     }
-    getArgs(cfg: MCConfig): MCArg{
+    getArgs(cfg: MCConfig): MCArg {
         var arg: MCArg;
         if(this.versionJson.hasOwnProperty('minecraftArguments')){
             arg = new LegacyMCArg(this.versionJson.minecraftArguments);
