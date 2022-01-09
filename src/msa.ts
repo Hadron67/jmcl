@@ -191,6 +191,7 @@ async function getMSAToken(self: MSACredential, ctx: AuthContext): Promise<Timed
     if (self.msaToken && self.msaToken.expiresOn - getNow() > 1) {
         return self.msaToken;
     } else {
+        self.msaToken = null;
         await validateMSAToken(self, ctx.logger);
         await ctx.saveUser();
         return self.msaToken;
