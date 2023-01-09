@@ -1,6 +1,7 @@
-import ts from 'rollup-plugin-typescript2';
-import sourcemaps from 'rollup-plugin-sourcemaps';
+// @ts-check
+import ts from '@rollup/plugin-typescript';
 import typescript from 'typescript';
+import sourcemaps from 'rollup-plugin-sourcemaps';
 import json from '@rollup/plugin-json';
 
 export default {
@@ -33,7 +34,7 @@ export default {
         }
     ],
     plugins:[
-        sourcemaps(),
+        // sourcemaps(),
         ts({ typescript }),
         json(),
     ]

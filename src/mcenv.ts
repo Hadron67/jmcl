@@ -4,6 +4,7 @@ import { input } from './input';
 import * as pathd from 'path';
 import * as pkg from '../package.json';
 import { ensureDir } from 'fs-extra';
+import { getOS } from './osutil';
 
 export interface MCConfig {
     launcherRoot: string;
@@ -12,6 +13,13 @@ export interface MCConfig {
     resolution: number[];
     isDemo: boolean;
     downloadConcurrentLimit: number;
+}
+
+function getDefaultMCRoot(home: string): string {
+    switch (getOS().osName) {
+        case 'osx': return pathd.join(home, 'Library', 'Application Support', 'minecraft');
+        default: return pathd.join(home, '.minecraft');
+    }
 }
 
 export class Context {
@@ -31,7 +39,7 @@ export class Context {
     constructor(public console: Console, logLevel: string){
         this.log = new Log(console, LogLevel[logLevel]);
         this.config.home = os.homedir();
-        this.config.mcRoot = process.env['MINECRAFT_HOME'] || pathd.join(this.config.home, '.minecraft');
+        this.config.mcRoot = process.env['MINECRAFT_HOME'] || getDefaultMCRoot(this.config.home);
         this.launcherName = pkg.name;
         this.launcherVersion = pkg.version;
     }

@@ -109,6 +109,7 @@ export async function main(argv: string[], errMsgs: string[]): Promise<void> {
     }
 
     let ctx = new Context(console, logLevel);
+    ctx.log.v('Config: ' + JSON.stringify(ctx.config));
     if (home !== null)
         ctx.config.home = home;
     if (gameDir !== null)

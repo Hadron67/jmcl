@@ -13,7 +13,7 @@ export interface CompatibilityRule {
         arch?: string;
     };
 }
-export function checkRule(env: MCConfig, rules: CompatibilityRule[]){
+export function checkRule(env: MCConfig, rules: CompatibilityRule[]): boolean {
     let allowed = false, disallowed = false;
     for (let rule of rules){
         let matched = true;
